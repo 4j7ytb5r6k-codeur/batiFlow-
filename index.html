@@ -25,6 +25,7 @@
       <a href="#fonctionnement">Comment ça marche</a>
       <a href="#tarifs">Tarifs</a>
       <a href="#faq">FAQ</a>
+      <a href="login.html">Connexion</a>
       <a href="#essai" class="btn btn--primary btn--sm">Essai gratuit</a>
     </nav>
     <button class="nav__toggle" id="menuToggle" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="menu">
@@ -247,9 +248,10 @@
           </select></div>
         <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required></div>
         <div class="field"><label for="phone">Téléphone</label><input id="phone" name="phone" type="tel" autocomplete="tel"></div>
+        <div class="field" id="passwordField" hidden><label for="password">Mot de passe (8 caractères minimum)</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="8"></div>
         <button class="btn btn--primary btn--lg btn--block" type="submit">Je commence mon essai gratuit</button>
         <p class="form__msg" id="formMsg" role="status" aria-live="polite"></p>
-        <p class="form__legal">En vous inscrivant, vous acceptez d'être contacté au sujet de votre essai.</p>
+        <p class="form__legal">En créant votre compte, vous acceptez d'être contacté au sujet de votre essai. Vous avez déjà un compte ? <a href="login.html" style="color:var(--blue);font-weight:700">Connexion</a></p>
       </form>
     </div>
   </section>
@@ -263,6 +265,9 @@
   </div>
 </footer>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

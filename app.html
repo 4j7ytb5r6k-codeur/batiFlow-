@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mon espace – batiFlow</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body class="dash" hidden>
+  <aside class="d-side">
+    <a href="index.html" class="d-brand">bati<b>Flow</b></a>
+    <nav aria-label="Menu de l'espace client">
+      <a class="is-active" href="#">Tableau de bord</a>
+      <a href="#">Chantiers</a><a href="#">Devis</a><a href="#">Comptes rendus</a>
+      <a href="#">Clients</a><a href="#">Planning</a><a href="#">Documents</a><a href="#">Statistiques</a>
+    </nav>
+    <div class="d-help"><strong>Besoin d'aide ?</strong><span>Notre équipe est là pour vous.</span><a class="btn btn--ghost btn--sm" href="index.html#faq">Nous contacter</a></div>
+  </aside>
+
+  <div class="d-main">
+    <header class="d-top">
+      <span class="d-trial" id="trial">Essai gratuit</span>
+      <div class="d-user"><span class="d-avatar" id="avatar">?</span><span><strong id="uname">Votre compte</strong><small id="ucompany"></small></span>
+        <button class="btn btn--ghost btn--sm" id="logout" type="button">Déconnexion</button></div>
+    </header>
+
+    <main class="d-content">
+      <div class="d-hello">
+        <div><h1 id="hello">Bonjour !</h1><p class="d-date" id="today"></p></div>
+        <button class="btn btn--primary" type="button">+ Nouveau chantier</button>
+      </div>
+      <p class="d-note">Espace créé automatiquement à votre inscription. Les chantiers, devis et comptes rendus ci-dessous sont des <strong>données d'exemple</strong>.</p>
+
+      <section class="d-stats" aria-label="Résumé">
+        <div class="d-card"><b data-count="12">12</b><span>Chantiers en cours</span></div>
+        <div class="d-card"><b data-count="5">5</b><span>Devis en attente <em class="tag tag--red">3 à relancer</em></span></div>
+        <div class="d-card"><b data-count="18">18</b><span>Comptes rendus ce mois-ci</span></div>
+        <div class="d-card"><b data-count="24">24</b><span>Clients au total</span></div>
+      </section>
+
+      <section class="d-feat">
+        <article class="d-card d-card--blue"><h2>1. Compte rendu par note vocale</h2><p>Parlez de votre journée, batiFlow s'occupe du reste.</p>
+          <div class="d-mic"><span class="d-micbtn" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span><strong>Cliquez pour enregistrer</strong><small>MP3, M4A, WAV (10 min max)</small></div></article>
+        <article class="d-card d-card--orange"><h2>2. Devis et relances automatiques</h2><p>Créez un devis et laissez batiFlow relancer.</p>
+          <ol class="timeline"><li><b>J+3</b> Première relance</li><li><b>J+7</b> Deuxième relance</li><li><b>J+14</b> Dernière relance</li></ol></article>
+        <article class="d-card d-card--green"><h2>3. Fiche chantier intelligente</h2><p>Toutes les informations au même endroit.</p>
+          <ul class="d-files"><li>Informations client</li><li>Devis et factures</li><li>Comptes rendus</li><li>Photos et documents</li><li>Planning</li></ul></article>
+      </section>
+
+      <section class="d-lists">
+        <article class="d-card"><h2>Mes chantiers</h2>
+          <ul class="d-rows">
+            <li><div><strong>Rénovation salle de bain</strong><small>M. Dupont · Paris 11e</small></div><div class="d-prog"><i style="width:70%"></i></div><em class="tag tag--green">70 %</em></li>
+            <li><div><strong>Rénovation appartement</strong><small>Mme Martin · Boulogne</small></div><div class="d-prog"><i style="width:45%"></i></div><em class="tag tag--green">45 %</em></li>
+            <li><div><strong>Peinture et sols</strong><small>M. Leroy · Saint-Cloud</small></div><div class="d-prog"><i style="width:0"></i></div><em class="tag tag--blue">À venir</em></li>
+            <li><div><strong>Extension maison</strong><small>M. Bernard · Clamart</small></div><div class="d-prog"><i style="width:100%"></i></div><em class="tag tag--green">Terminé</em></li>
+          </ul></article>
+        <article class="d-card"><h2>Devis à relancer</h2>
+          <ul class="d-rows">
+            <li><div><strong>Rénovation cuisine</strong><small>Mme Petit · envoyé le 17/09</small></div><b>8 450 €</b><em class="tag tag--red">J+3</em></li>
+            <li><div><strong>Salle de bain</strong><small>M. Durand · envoyé le 12/09</small></div><b>12 200 €</b><em class="tag tag--red">J+7</em></li>
+            <li><div><strong>Peinture complète</strong><small>Mme Moreau · envoyé le 10/09</small></div><b>3 600 €</b><em class="tag tag--red">J+14</em></li>
+          </ul></article>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

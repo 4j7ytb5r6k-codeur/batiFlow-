@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connexion – batiFlow</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body class="auth">
+  <main class="auth__box">
+    <a href="index.html" class="logo" aria-label="batiFlow, accueil">
+      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#2563eb"/><path d="M16 7 6 15h3v9h14v-9h3z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
+      <span class="logo__t">bati<span>Flow</span></span>
+    </a>
+    <h1>Connexion à votre espace</h1>
+    <p class="auth__sub" id="demoNote" hidden>Mode démo : Supabase n'est pas encore configuré (voir README). Le bouton ouvre un espace d'exemple.</p>
+    <form id="loginForm" class="form" novalidate>
+      <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required></div>
+      <div class="field"><label for="password">Mot de passe</label><input id="password" name="password" type="password" autocomplete="current-password" required></div>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">Me connecter</button>
+      <p class="form__msg" id="formMsg" role="status" aria-live="polite"></p>
+      <p class="form__legal"><a href="#" id="forgot" style="color:var(--blue);font-weight:700">Mot de passe oublié ?</a> · <a href="index.html#essai" style="color:var(--blue);font-weight:700">Créer un compte (essai 7 jours)</a></p>
+    </form>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    const form = document.getElementById('loginForm');
+    const msg = document.getElementById('formMsg');
+    const say = (t, ok) => { msg.textContent = t; msg.className = 'form__msg ' + (ok ? 'is-ok' : 'is-error'); };
+
+    if (!window.bfClient) document.getElementById('demoNote').hidden = false;
+    else window.bfClient.auth.getSession().then(({ data }) => { if (data.session) location.replace('app.html'); });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!window.bfClient) { location.href = 'app.html'; return; }
+      const email = form.email.value.trim(), password = form.password.value;
+      if (!email || !password) return say('Saisissez votre email et votre mot de passe.');
+      const { error } = await window.bfClient.auth.signInWithPassword({ email, password });
+      if (error) return say(/confirm/i.test(error.message) ? 'Confirmez d\'abord votre adresse email (lien reçu par mail).' : 'Email ou mot de passe incorrect.');
+      location.href = 'app.html';
+    });
+
+    document.getElementById('forgot').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const email = form.email.value.trim();
+      if (!window.bfClient) return say('Disponible une fois Supabase configuré.');
+      if (!email) return say('Saisissez d\'abord votre email ci-dessus.');
+      const { error } = await window.bfClient.auth.resetPasswordForEmail(email, { redirectTo: new URL('app.html', location.href).href });
+      error ? say('Impossible d\'envoyer le mail, réessayez.') : say('Si un compte existe, un lien de réinitialisation vient d\'être envoyé.', true);
+    });
+  </script>
+</body>
+</html>

@@ -21,6 +21,13 @@ const FORM_ENDPOINT = '';
 
 const form = document.getElementById('trialForm');
 const msg = document.getElementById('formMsg');
+const field = (n) => form.elements.namedItem(n);
+
+// Avec Supabase configuré, le formulaire crée un vrai compte (donc l'espace client) : il demande un mot de passe.
+if (window.bfClient) {
+  document.getElementById('passwordField').hidden = false;
+  field('password').required = true;
+}
 
 function setError(input, hasError) {
   input.closest('.field').classList.toggle('has-error', hasError);
@@ -29,22 +36,43 @@ function setError(input, hasError) {
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(form));
+  const password = data.password || '';
+  delete data.password; // ne jamais stocker ni envoyer le mot de passe ailleurs que vers Supabase
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email || '');
   const nameOk = (data.name || '').trim().length > 1;
   const tradeOk = !!data.trade;
+  const passOk = !window.bfClient || password.length >= 8;
 
-  setError(form.name, !nameOk);
-  setError(form.email, !emailOk);
-  setError(form.trade, !tradeOk);
+  setError(field('name'), !nameOk);
+  setError(field('email'), !emailOk);
+  setError(field('trade'), !tradeOk);
+  setError(field('password'), !passOk);
 
   msg.className = 'form__msg';
-  if (!(nameOk && emailOk && tradeOk)) {
-    msg.textContent = 'Merci de compléter les champs en rouge.';
+  if (!(nameOk && emailOk && tradeOk && passOk)) {
+    msg.textContent = passOk ? 'Merci de compléter les champs en rouge.' : 'Le mot de passe doit contenir au moins 8 caractères.';
     msg.classList.add('is-error');
     return;
   }
 
   try {
+    if (window.bfClient) {
+      // Création du compte : un déclencheur Supabase crée aussitôt l'espace client (supabase/schema.sql).
+      const { data: res, error } = await window.bfClient.auth.signUp({
+        email: data.email,
+        password,
+        options: {
+          data: { full_name: data.name.trim(), company: data.company || '', trade: data.trade, phone: data.phone || '' },
+          emailRedirectTo: new URL('app.html', location.href).href,
+        },
+      });
+      if (error) throw error;
+      form.reset();
+      if (res.session) { location.href = 'app.html'; return; }
+      msg.textContent = 'Compte créé ! Confirmez votre adresse email (lien envoyé dans votre boîte mail) pour accéder à votre espace client.';
+      msg.classList.add('is-ok');
+      return;
+    }
     if (FORM_ENDPOINT) {
       const res = await fetch(FORM_ENDPOINT, {
         method: 'POST',
@@ -57,10 +85,12 @@ form.addEventListener('submit', async (e) => {
       let sent = false;
       if (/^https?:$/.test(location.protocol) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
         try {
+          const body = new FormData(form);
+          body.delete('password');
           const res = await fetch('/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams(new FormData(form)).toString(),
+            body: new URLSearchParams(body).toString(),
           });
           sent = res.ok;
         } catch { sent = false; }
@@ -75,8 +105,11 @@ form.addEventListener('submit', async (e) => {
     form.reset();
     msg.textContent = 'Merci ! Votre essai gratuit de 7 jours est enregistré. Nous vous contactons très vite.';
     msg.classList.add('is-ok');
-  } catch {
-    msg.textContent = "Une erreur est survenue, merci de réessayer.";
+  } catch (err) {
+    const already = err && /already registered|already been registered/i.test(err.message || '');
+    msg.textContent = already
+      ? 'Un compte existe déjà avec cet email. Utilisez « Connexion ».'
+      : "Une erreur est survenue, merci de réessayer.";
     msg.classList.add('is-error');
   }
 });
