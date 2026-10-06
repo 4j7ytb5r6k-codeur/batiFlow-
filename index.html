@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>batiFlow – L'assistant des pros du bâtiment | Essai gratuit 7 jours</title>
+  <meta name="description" content="batiFlow automatise vos comptes rendus, devis et relances. Peintres, maçons, artisans du BTP : testez gratuitement pendant 7 jours.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Cpath d='M16 7 6 15h3v9h14v-9h3z' fill='none' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="nav" id="top">
+  <div class="container nav__inner">
+    <a href="#top" class="logo" aria-label="batiFlow, accueil">
+      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#2563eb"/><path d="M16 7 6 15h3v9h14v-9h3z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
+      <span class="logo__t">bati<span>Flow</span></span>
+    </a>
+    <nav class="nav__links" id="menu" aria-label="Navigation principale">
+      <a href="#fonctionnalites">Fonctionnalités</a>
+      <a href="#fonctionnement">Comment ça marche</a>
+      <a href="#tarifs">Tarifs</a>
+      <a href="#faq">FAQ</a>
+      <a href="#essai" class="btn btn--primary btn--sm">Essai gratuit</a>
+    </nav>
+    <button class="nav__toggle" id="menuToggle" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- HERO -->
+  <section class="hero">
+    <div class="container hero__inner">
+      <div class="hero__text">
+        <span class="pill">Pour peintres, maçons et artisans du BTP</span>
+        <h1>Moins de paperasse, <em>plus de chantiers.</em></h1>
+        <p class="lead">batiFlow rédige vos comptes rendus à partir d'une note vocale, envoie vos devis et relance vos clients automatiquement. Tout est rangé dans une fiche par chantier.</p>
+        <div class="hero__cta">
+          <a href="#essai" class="btn btn--primary btn--lg">Démarrer mon essai gratuit de 7 jours</a>
+          <a href="#fonctionnement" class="btn btn--ghost btn--lg">Voir comment ça marche</a>
+        </div>
+        <ul class="ticks">
+          <li>Sans carte bancaire</li>
+          <li>Prêt en 5 minutes</li>
+          <li>Sans engagement</li>
+        </ul>
+      </div>
+
+      <!-- Maquette du tableau de bord -->
+      <div class="app" aria-hidden="true">
+        <div class="app__side">
+          <div class="app__brand">bati<b>Flow</b></div>
+          <div class="app__item is-active">Tableau de bord</div>
+          <div class="app__item">Chantiers</div>
+          <div class="app__item">Devis</div>
+          <div class="app__item">Comptes rendus</div>
+          <div class="app__item">Clients</div>
+          <div class="app__item">Planning</div>
+        </div>
+        <div class="app__main">
+          <div class="app__hello"><strong>Bonjour Thomas !</strong><span class="app__btn">+ Nouveau chantier</span></div>
+          <div class="app__stats">
+            <div><b>12</b><small>Chantiers en cours</small></div>
+            <div><b>5</b><small>Devis en attente</small></div>
+            <div><b>18</b><small>Comptes rendus</small></div>
+          </div>
+          <div class="app__card">
+            <div class="app__row"><span>Rénovation salle de bain</span><em class="tag tag--green">En cours</em></div>
+            <div class="bar"><i style="width:70%"></i></div>
+            <div class="app__row"><span>Rénovation appartement</span><em class="tag tag--green">En cours</em></div>
+            <div class="bar"><i style="width:45%"></i></div>
+            <div class="app__row"><span>Peinture et sols</span><em class="tag tag--blue">À venir</em></div>
+            <div class="bar"><i style="width:8%"></i></div>
+          </div>
+          <div class="app__card app__card--warn">
+            <div class="app__row"><span>Devis cuisine · 8 450 €</span><em class="tag tag--red">J+3</em></div>
+            <div class="app__row"><span>Devis salle de bain · 12 200 €</span><em class="tag tag--red">J+7</em></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROBLÈMES -->
+  <section class="section section--alt">
+    <div class="container">
+      <h2 class="section__title">Le soir, vous avez mieux à faire que de la paperasse</h2>
+      <div class="grid grid--3">
+        <article class="card"><div class="ico ico--red">⏱</div><h3>Les comptes rendus qui traînent</h3><p>Après une journée sur le chantier, rédiger un compte rendu est la dernière chose dont vous avez envie.</p></article>
+        <article class="card"><div class="ico ico--red">✉</div><h3>Des devis jamais relancés</h3><p>Un devis sans réponse, c'est du chiffre d'affaires perdu. Mais qui a le temps de relancer ?</p></article>
+        <article class="card"><div class="ico ico--red">🗂</div><h3>Des infos éparpillées</h3><p>Photos sur le téléphone, devis dans les mails, notes sur papier… Impossible de s'y retrouver.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- FONCTIONNALITÉS -->
+  <section class="section" id="fonctionnalites">
+    <div class="container">
+      <span class="eyebrow">Fonctionnalités</span>
+      <h2 class="section__title">Trois automatisations qui vous rendent des heures</h2>
+
+      <div class="feature feature--blue">
+        <div class="feature__text">
+          <h3><span class="num">1</span> Compte rendu par note vocale</h3>
+          <p>Parlez de votre journée, batiFlow s'occupe du reste : il transcrit, structure et met en forme un compte rendu propre, prêt à envoyer à votre client.</p>
+          <ul class="list"><li>Enregistrez ou importez un fichier audio (MP3, M4A, WAV)</li><li>Compte rendu mis en forme automatiquement</li><li>Envoi au client en un clic</li></ul>
+        </div>
+        <div class="feature__visual">
+          <div class="mic"><span class="mic__btn" aria-hidden="true">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>
+            <strong>Cliquez pour enregistrer</strong><small>ou glissez une note vocale ici</small></div>
+        </div>
+      </div>
+
+      <div class="feature feature--orange feature--rev">
+        <div class="feature__text">
+          <h3><span class="num">2</span> Devis et relances automatiques</h3>
+          <p>Créez un devis et laissez batiFlow gérer les relances. Fini les devis oubliés dans une boîte mail.</p>
+          <ul class="list"><li>Relances programmées à J+3, J+7 et J+14</li><li>Arrêt automatique dès que le client répond</li><li>Suivi des montants en attente</li></ul>
+        </div>
+        <div class="feature__visual">
+          <ol class="timeline">
+            <li><b>J+3</b> Première relance automatique</li>
+            <li><b>J+7</b> Deuxième relance</li>
+            <li><b>J+14</b> Dernière relance</li>
+            <li class="timeline__stop">✓ Arrêt des relances si réponse du client</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="feature feature--green">
+        <div class="feature__text">
+          <h3><span class="num">3</span> Fiche chantier intelligente</h3>
+          <p>Toutes les informations d'un chantier au même endroit, retrouvables en quelques secondes depuis votre téléphone.</p>
+          <ul class="list"><li>Infos client, devis et factures</li><li>Comptes rendus, photos et documents</li><li>Planning et historique des échanges</li></ul>
+        </div>
+        <div class="feature__visual">
+          <ul class="files">
+            <li>Informations client</li><li>Devis et factures</li><li>Comptes rendus</li>
+            <li>Photos</li><li>Documents</li><li>Planning</li><li>Historique des échanges</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMMENT ÇA MARCHE -->
+  <section class="section section--alt" id="fonctionnement">
+    <div class="container">
+      <span class="eyebrow">Comment ça marche</span>
+      <h2 class="section__title">Opérationnel en 3 étapes</h2>
+      <div class="grid grid--3 steps">
+        <article class="card"><div class="step">1</div><h3>Créez votre compte</h3><p>Une minute suffit. Aucune carte bancaire demandée pendant l'essai.</p></article>
+        <article class="card"><div class="step">2</div><h3>Ajoutez un chantier</h3><p>Renseignez le client, importez vos devis existants ou créez-en un nouveau.</p></article>
+        <article class="card"><div class="step">3</div><h3>Laissez faire batiFlow</h3><p>Dictez vos comptes rendus, les relances partent toutes seules.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHIFFRES -->
+  <section class="stats">
+    <div class="container grid grid--3">
+      <div><b>5 h</b><span>gagnées par semaine*</span></div>
+      <div><b>3×</b><span>moins de devis sans réponse*</span></div>
+      <div><b>0</b><span>compte rendu oublié</span></div>
+    </div>
+    <p class="stats__note container">*Objectifs indicatifs, à confirmer avec vos propres chiffres.</p>
+  </section>
+
+  <!-- TARIFS -->
+  <section class="section" id="tarifs">
+    <div class="container">
+      <span class="eyebrow">Tarifs</span>
+      <h2 class="section__title">7 jours gratuits, puis un tarif simple</h2>
+      <div class="grid grid--2 pricing">
+        <article class="card plan plan--featured">
+          <span class="plan__badge">Essai gratuit</span>
+          <h3>7 jours offerts</h3>
+          <p class="plan__price">0 €</p>
+          <ul class="list"><li>Toutes les fonctionnalités</li><li>Sans carte bancaire</li><li>Sans engagement</li></ul>
+          <a href="#essai" class="btn btn--primary btn--block">Démarrer l'essai</a>
+        </article>
+        <article class="card plan">
+          <h3>Abonnement Pro</h3>
+          <p class="plan__price">À définir <small>/ mois</small></p>
+          <ul class="list"><li>Chantiers, devis et comptes rendus illimités</li><li>Relances automatiques</li><li>Support par messagerie</li></ul>
+          <a href="#essai" class="btn btn--ghost btn--block">Commencer par l'essai</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="section section--alt" id="faq">
+    <div class="container container--narrow">
+      <span class="eyebrow">FAQ</span>
+      <h2 class="section__title">Questions fréquentes</h2>
+      <details><summary>L'essai est-il vraiment gratuit ?</summary><p>Oui, 7 jours complets, sans carte bancaire. À la fin, vous choisissez de continuer ou non.</p></details>
+      <details><summary>Faut-il être à l'aise avec l'informatique ?</summary><p>Non. batiFlow est pensé pour être utilisé depuis un téléphone, avec une simple note vocale.</p></details>
+      <details><summary>Est-ce adapté à mon métier ?</summary><p>Oui : peintres, maçons, plombiers, électriciens, plaquistes, et plus largement tous les artisans du bâtiment.</p></details>
+      <details><summary>Que deviennent mes données ?</summary><p>Elles vous appartiennent. Vous pouvez les exporter ou les supprimer à tout moment.</p></details>
+    </div>
+  </section>
+
+  <!-- ESSAI GRATUIT -->
+  <section class="section cta" id="essai">
+    <div class="container container--narrow">
+      <h2>Démarrez votre essai gratuit de 7 jours</h2>
+      <p class="lead">Créez votre compte en une minute. Aucune carte bancaire requise.</p>
+      <form id="trialForm" class="form" novalidate>
+        <div class="field"><label for="name">Nom et prénom</label><input id="name" name="name" type="text" autocomplete="name" required></div>
+        <div class="field"><label for="company">Entreprise</label><input id="company" name="company" type="text" autocomplete="organization"></div>
+        <div class="field"><label for="trade">Votre métier</label>
+          <select id="trade" name="trade" required>
+            <option value="">Choisir…</option><option>Peintre</option><option>Maçon</option><option>Plombier</option><option>Électricien</option><option>Plaquiste</option><option>Autre</option>
+          </select></div>
+        <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required></div>
+        <div class="field"><label for="phone">Téléphone</label><input id="phone" name="phone" type="tel" autocomplete="tel"></div>
+        <button class="btn btn--primary btn--lg btn--block" type="submit">Je commence mon essai gratuit</button>
+        <p class="form__msg" id="formMsg" role="status" aria-live="polite"></p>
+        <p class="form__legal">En vous inscrivant, vous acceptez d'être contacté au sujet de votre essai.</p>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container footer__inner">
+    <span class="logo logo--light">bati<span>Flow</span></span>
+    <small>© <span id="year"></span> batiFlow. Tous droits réservés.</small>
+    <nav><a href="#fonctionnalites">Fonctionnalités</a><a href="#tarifs">Tarifs</a><a href="#faq">FAQ</a></nav>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
