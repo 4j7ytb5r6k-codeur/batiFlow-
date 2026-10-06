@@ -142,3 +142,18 @@ if (!reduceMotion.matches) {
     });
   }
 }
+
+// Tarifs : bascule mensuel / annuel
+const billingBtns = document.querySelectorAll('.billing__btn');
+billingBtns.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const period = btn.dataset.period;
+    billingBtns.forEach((b) => {
+      const on = b === btn;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    document.querySelectorAll('[data-price]').forEach((el) => { el.textContent = el.dataset[period]; });
+    document.querySelectorAll('[data-billed]').forEach((el) => { el.textContent = el.dataset[period]; });
+  });
+});
