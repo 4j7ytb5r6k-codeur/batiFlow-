@@ -131,7 +131,7 @@ h1 em{font-style:normal;color:var(--blue)}
 .billing__btn em{font-style:normal;font-size:.72rem;background:#dcfce7;color:#15803d;border-radius:99px;padding:2px 8px;margin-left:6px}
 .billing__btn.is-active{background:var(--blue);color:#fff;box-shadow:0 4px 12px rgba(37,99,235,.3)}
 .billing__btn:focus-visible{outline:3px solid #c9d7fb;outline-offset:2px}
-.plan__billed{font-size:.85rem;font-weight:600;min-height:1.4em}
+.plan__billed{font-size:.85rem;font-weight:600;min-height:2.8em}
 .plan__for{font-size:.92rem}
 .pricing__note{text-align:center;color:var(--muted);font-weight:600;margin-top:26px}
 .plan__price{font-size:2.4rem;font-weight:800;color:var(--navy)!important;line-height:1}
