@@ -18,7 +18,7 @@ python3 -m http.server 8000
 - Textes : `index.html`
 - Couleurs : variables en haut de `styles.css`
 - Formulaire d'essai gratuit : renseigner `FORM_ENDPOINT` dans `script.js` (Formspree, API maison…). Sans URL, l'inscription est simulée et stockée dans le navigateur.
-- Prix : section « Tarifs » de `index.html` (Solo 29 € et Équipe 59 € HT/mois, prix à ajuster).
+- Prix : section « Tarifs » de `index.html` (Essentiel 29 € et Pro 59 € HT/mois, prix à ajuster).
 
 ## Mise en ligne
 
