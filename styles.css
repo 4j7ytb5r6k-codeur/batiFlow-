@@ -126,6 +126,8 @@ h1 em{font-style:normal;color:var(--blue)}
 .plan .list{flex:1}
 .plan--featured{border:2px solid var(--blue)}
 .plan__badge{position:absolute;top:-13px;left:24px;background:var(--blue);color:#fff;font-size:.78rem;font-weight:700;padding:4px 12px;border-radius:99px}
+.plan__for{font-size:.92rem}
+.pricing__note{text-align:center;color:var(--muted);font-weight:600;margin-top:26px}
 .plan__price{font-size:2.4rem;font-weight:800;color:var(--navy)!important;line-height:1}
 .plan__price small{font-size:1rem;color:var(--muted);font-weight:600}
 
