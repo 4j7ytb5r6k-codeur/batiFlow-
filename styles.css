@@ -236,3 +236,5 @@ input:focus,select:focus{outline:3px solid #c9d7fb;border-color:var(--blue)}
 @keyframes drift1{to{transform:translate3d(-12vmax,10vmax,0) scale(1.15)}}
 @keyframes drift2{to{transform:translate3d(14vmax,-8vmax,0) scale(1.2)}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.btn{translate:none!important}}
+
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}

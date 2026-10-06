@@ -53,10 +53,24 @@ form.addEventListener('submit', async (e) => {
       });
       if (!res.ok) throw new Error('Erreur serveur');
     } else {
-      // Mode démo : enregistrement local uniquement
-      const list = JSON.parse(localStorage.getItem('batiflow_trials') || '[]');
-      list.push({ ...data, date: new Date().toISOString() });
-      localStorage.setItem('batiflow_trials', JSON.stringify(list));
+      // Netlify Forms : fonctionne sans configuration une fois le site déployé sur Netlify.
+      let sent = false;
+      if (/^https?:$/.test(location.protocol) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+        try {
+          const res = await fetch('/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams(new FormData(form)).toString(),
+          });
+          sent = res.ok;
+        } catch { sent = false; }
+      }
+      if (!sent) {
+        // Mode démo (aperçu local ou hébergeur sans Netlify Forms) : enregistrement dans le navigateur
+        const list = JSON.parse(localStorage.getItem('batiflow_trials') || '[]');
+        list.push({ ...data, date: new Date().toISOString() });
+        localStorage.setItem('batiflow_trials', JSON.stringify(list));
+      }
     }
     form.reset();
     msg.textContent = 'Merci ! Votre essai gratuit de 7 jours est enregistré. Nous vous contactons très vite.';

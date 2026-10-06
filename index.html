@@ -236,7 +236,9 @@
     <div class="container container--narrow">
       <h2>Démarrez votre essai gratuit de 7 jours</h2>
       <p class="lead">Créez votre compte en une minute. Aucune carte bancaire requise.</p>
-      <form id="trialForm" class="form" novalidate>
+      <form id="trialForm" class="form" name="essai-gratuit" method="POST" action="/merci.html" data-netlify="true" netlify-honeypot="bot-field" novalidate>
+        <input type="hidden" name="form-name" value="essai-gratuit">
+        <p class="hp" aria-hidden="true"><label>Ne pas remplir <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
         <div class="field"><label for="name">Nom et prénom</label><input id="name" name="name" type="text" autocomplete="name" required></div>
         <div class="field"><label for="company">Entreprise</label><input id="company" name="company" type="text" autocomplete="organization"></div>
         <div class="field"><label for="trade">Votre métier</label>

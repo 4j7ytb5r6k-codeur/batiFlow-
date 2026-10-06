@@ -17,9 +17,17 @@ python3 -m http.server 8000
 
 - Textes : `index.html`
 - Couleurs : variables en haut de `styles.css`
-- Formulaire d'essai gratuit : renseigner `FORM_ENDPOINT` dans `script.js` (Formspree, API maison…). Sans URL, l'inscription est simulée et stockée dans le navigateur.
+- Formulaire d'essai gratuit : prêt pour Netlify Forms (les inscriptions apparaissent dans Netlify > Forms > « essai-gratuit »). Pour un autre service, renseigner `FORM_ENDPOINT` dans `script.js`. Hors Netlify, l'inscription est simulée et stockée dans le navigateur.
 - Prix : section « Tarifs » de `index.html` (Essentiel 35 € et Pro 70 € TTC/mois, ou 350 € et 700 € TTC/an, prix à ajuster ; bascule gérée dans `script.js`).
 
 ## Mise en ligne
 
-Glissez le dossier sur Netlify, ou connectez le dépôt à Vercel / GitHub Pages. Aucune étape de build.
+### Netlify (recommandé, gère aussi le formulaire)
+
+1. Créez un compte sur https://app.netlify.com (gratuit).
+2. « Add new site » > « Import an existing project » > GitHub > choisissez ce dépôt et la branche à publier.
+3. Laissez les réglages par défaut (`netlify.toml` s'en charge, aucune commande de build) puis « Deploy ».
+4. Dans Netlify > Forms > « essai-gratuit » > Notifications, ajoutez votre email pour recevoir chaque inscription.
+5. Pour une adresse personnalisée : Domain management > Add a domain.
+
+Sans compte : glissez-déposez le dossier sur https://app.netlify.com/drop.
