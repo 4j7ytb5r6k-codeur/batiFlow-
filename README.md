@@ -20,19 +20,19 @@ python3 -m http.server 8000
 - Formulaire d'essai gratuit : prêt pour Netlify Forms (les inscriptions apparaissent dans Netlify > Forms > « essai-gratuit »). Pour un autre service, renseigner `FORM_ENDPOINT` dans `script.js`. Hors Netlify, l'inscription est simulée et stockée dans le navigateur.
 - Prix : section « Tarifs » de `index.html` (Essentiel 35 € et Pro 70 € TTC/mois, ou 350 € et 700 € TTC/an, prix à ajuster ; bascule gérée dans `script.js`).
 
-## Espace client (Supabase)
+## Espace client et administration (Supabase)
 
-À l'inscription, un compte est créé et l'espace client (profil + essai de 7 jours) est créé automatiquement. Pages : `login.html` (connexion) et `app.html` (tableau de bord, réservé aux comptes connectés, avec des données d'exemple).
+Pages : `login.html` (connexion), `app.html` (espace client : clients, chantiers, devis avec rappels de relance J+3/J+7/J+14, comptes rendus par dictée vocale, export et suppression des données), `admin.html` (administration : clients, essais, abonnés, CA estimé, messages de contact).
 
-Tant que `config.js` est vide, le site reste en mode démo (aucun compte réel).
+- **Base** : projet Supabase `yvdkrrkrxiizyelivtlv` (Francfort). Tout le schéma est dans `supabase/schema.sql` (déjà appliqué).
+- **Administrateur** : le compte `batiFlow23@gmail.com` devient administrateur automatiquement une fois son email confirmé (voir `supabase/schema.sql`). Pour changer d'adresse, modifier les deux fonctions SQL `handle_new_user` et `grant_admin_on_confirm`.
+- **Sécurité** : chaque client ne voit que ses données (règles RLS vérifiées). Les en-têtes de sécurité (CSP, HSTS…) sont dans `netlify.toml`.
+- **RGPD** : polices et bibliothèque Supabase hébergées avec le site (`fonts/`, `vendor/`), aucun traceur.
+- **CA** : le CA de l'administration est une estimation d'après l'offre attribuée à chaque client, pas des encaissements (pas de paiement en ligne pour l'instant).
 
-> Déjà fait pour le projet `yvdkrrkrxiizyelivtlv` : `config.js` est rempli et `supabase/schema.sql` est appliqué. Il reste l'étape 4 (adresse du site). Les étapes 1 à 3 ne servent que pour un nouveau projet.
+À faire côté Supabase (Authentication > URL Configuration) : renseigner l'adresse du site dans « Site URL » et « Redirect URLs ». Pour la production, configurer un SMTP (Authentication > SMTP Settings).
 
-1. Créez un projet gratuit sur https://supabase.com.
-2. Supabase > SQL Editor > New query : collez le contenu de `supabase/schema.sql` puis « Run ». Cela crée la table `profiles`, les règles de sécurité (RLS) et le déclencheur qui crée l'espace client à chaque inscription.
-3. Supabase > Project Settings > API : copiez l'URL du projet et la clé « anon public » dans `config.js`. N'utilisez jamais la clé `service_role`.
-4. Supabase > Authentication > URL Configuration : mettez l'adresse du site en production dans « Site URL » et ajoutez-la dans « Redirect URLs » (sinon le lien de confirmation par email pointe au mauvais endroit).
-5. Supabase > Authentication > Providers > Email : laissez « Confirm email » activé (recommandé). L'email de confirmation par défaut est limité en volume ; pour la production, configurez un SMTP (Authentication > SMTP Settings).
+À compléter dans le site avant de vendre : `mentions-legales.html`, `cgv.html`, `confidentialite.html` (passages surlignés `[À COMPLÉTER]`), puis faire relire par un juriste.
 
 ## Mise en ligne
 

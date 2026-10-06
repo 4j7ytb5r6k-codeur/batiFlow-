@@ -259,3 +259,61 @@ if (!reduceMotion.matches && window.matchMedia('(hover: hover) and (pointer: fin
   });
   zone.addEventListener('pointerleave', () => { cancelAnimationFrame(raf); app.style.rotate = 'none'; });
 }
+
+// ---------- Formulaire de contact ----------
+(function () {
+  const cf = document.getElementById('contactForm');
+  if (!cf) return;
+  const cmsg = document.getElementById('contactMsg');
+  const cfg = window.BATIFLOW_CONFIG || {};
+  if (cfg.CONTACT_EMAIL) {
+    document.querySelectorAll('[data-contact-email]').forEach((a) => {
+      a.textContent = cfg.CONTACT_EMAIL;
+      a.href = 'mailto:' + cfg.CONTACT_EMAIL;
+    });
+  }
+  const els = cf.elements;
+  const flag = (n, bad) => els.namedItem(n).closest('.field').classList.toggle('has-error', bad);
+
+  cf.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const v = Object.fromEntries(new FormData(cf));
+    const okName = (v.name || '').trim().length > 0;
+    const okMail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email || '');
+    const okMsg = (v.message || '').trim().length >= 5;
+    flag('name', !okName); flag('email', !okMail); flag('message', !okMsg);
+    cmsg.className = 'form__msg';
+    if (!(okName && okMail && okMsg)) {
+      cmsg.textContent = 'Merci de compléter les champs en rouge.';
+      cmsg.classList.add('is-error');
+      return;
+    }
+    let sent = false;
+    // 1) Base de données : le message apparaît dans l'espace administrateur
+    if (window.bfClient) {
+      try {
+        const { error } = await window.bfClient.from('contact_messages').insert({
+          name: v.name.trim(), email: v.email.trim(), message: v.message.trim(),
+        });
+        sent = !error;
+      } catch { sent = false; }
+    }
+    // 2) Netlify Forms : permet de recevoir aussi une notification par email (réglage dans Netlify)
+    if (/^https?:$/.test(location.protocol) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+      try {
+        const body = new FormData(cf);
+        const res = await fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(body).toString() });
+        sent = sent || res.ok;
+      } catch { /* sans effet */ }
+    }
+    if (sent) {
+      cf.reset();
+      cmsg.textContent = 'Merci, votre message est envoyé. Nous vous répondons rapidement.';
+      cmsg.classList.add('is-ok');
+    } else {
+      const to = cfg.CONTACT_EMAIL || '';
+      cmsg.textContent = 'Envoi impossible pour le moment. Écrivez-nous directement' + (to ? ' à ' + to : '') + '.';
+      cmsg.classList.add('is-error');
+    }
+  });
+})();

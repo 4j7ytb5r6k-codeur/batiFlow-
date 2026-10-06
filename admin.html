@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Administration – batiFlow</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body class="adm" hidden>
+  <header class="adm__top">
+    <a href="index.html" class="d-brand">bati<b>Flow</b> <small>Administration</small></a>
+    <div class="adm__links"><a class="btn btn--ghost btn--sm" href="app.html">Mon espace</a><button class="btn btn--ghost btn--sm" id="logout" type="button">Déconnexion</button></div>
+  </header>
+  <main class="adm__main" id="root" aria-live="polite"></main>
+  <script src="vendor/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
