@@ -1,3 +1,5 @@
+-- ÉTAT : déjà appliqué sur le projet Supabase yvdkrrkrxiizyelivtlv (pas besoin de le relancer).
+-- Si l'exécution d'un seul bloc expire, lancez les instructions une par une.
 -- batiFlow : espace client créé automatiquement à l'inscription.
 -- À coller dans Supabase > SQL Editor > New query, puis « Run ».
 
@@ -16,10 +18,10 @@ alter table public.profiles enable row level security;
 
 -- Chaque client lit uniquement son propre espace.
 -- Aucune policy d'écriture : le client ne peut pas modifier son plan ni la fin de son essai.
-drop policy if exists "profil lisible par son propriétaire" on public.profiles;
-create policy "profil lisible par son propriétaire"
+drop policy if exists "profiles_select_own" on public.profiles;
+create policy "profiles_select_own"
   on public.profiles for select
-  using (auth.uid() = id);
+  using ((select auth.uid()) = id);
 
 -- À chaque création de compte, l'espace client (profil + essai de 7 jours) est créé.
 create or replace function public.handle_new_user()
@@ -40,6 +42,9 @@ begin
   return new;
 end;
 $$;
+
+-- La fonction n'est appelée que par le déclencheur, jamais directement par un client.
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created

@@ -26,6 +26,8 @@ python3 -m http.server 8000
 
 Tant que `config.js` est vide, le site reste en mode démo (aucun compte réel).
 
+> Déjà fait pour le projet `yvdkrrkrxiizyelivtlv` : `config.js` est rempli et `supabase/schema.sql` est appliqué. Il reste l'étape 4 (adresse du site). Les étapes 1 à 3 ne servent que pour un nouveau projet.
+
 1. Créez un projet gratuit sur https://supabase.com.
 2. Supabase > SQL Editor > New query : collez le contenu de `supabase/schema.sql` puis « Run ». Cela crée la table `profiles`, les règles de sécurité (RLS) et le déclencheur qui crée l'espace client à chaque inscription.
 3. Supabase > Project Settings > API : copiez l'URL du projet et la clé « anon public » dans `config.js`. N'utilisez jamais la clé `service_role`.
