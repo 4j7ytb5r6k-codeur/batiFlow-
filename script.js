@@ -157,3 +157,30 @@ billingBtns.forEach((btn) => {
     document.querySelectorAll('[data-billed]').forEach((el) => { el.textContent = el.dataset[period]; });
   });
 });
+
+// Animation de chaque section + barre de progression du scroll
+if (!reduceMotion.matches) {
+  const sections = document.querySelectorAll('main > section:not(.hero)');
+  sections.forEach((el) => el.classList.add('sect'));
+  const sectIO = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (e.isIntersecting) { e.target.classList.add('is-visible'); sectIO.unobserve(e.target); }
+    });
+  }, { threshold: 0.06 });
+  sections.forEach((el) => sectIO.observe(el));
+
+  const bar = document.createElement('div');
+  bar.className = 'progress';
+  bar.setAttribute('aria-hidden', 'true');
+  document.body.prepend(bar);
+  let ticking = false;
+  function updateProgress() {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    bar.style.transform = 'scaleX(' + (max > 0 ? Math.min(window.scrollY / max, 1) : 0).toFixed(4) + ')';
+    ticking = false;
+  }
+  window.addEventListener('scroll', () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(updateProgress); }
+  }, { passive: true });
+  updateProgress();
+}
