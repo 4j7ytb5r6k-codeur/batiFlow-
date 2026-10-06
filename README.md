@@ -22,12 +22,14 @@ python3 -m http.server 8000
 
 ## Espace client et administration (Supabase)
 
-Pages : `login.html` (connexion), `app.html` (espace client : clients, chantiers, devis avec rappels de relance J+3/J+7/J+14, comptes rendus par dictée vocale, export et suppression des données), `admin.html` (administration : clients, essais, abonnés, CA estimé, messages de contact).
+Pages : `login.html` (connexion), `app.html` (espace client : clients, chantiers avec photos, devis détaillés avec PDF et rappels de relance J+3/J+7/J+14, comptes rendus par dictée vocale, informations d'entreprise, export et suppression des données), `admin.html` (administration : clients, essais, abonnés, CA estimé, messages de contact).
 
 - **Base** : projet Supabase `yvdkrrkrxiizyelivtlv` (Francfort). Tout le schéma est dans `supabase/schema.sql` (déjà appliqué).
 - **Administrateur** : le compte `batiFlow23@gmail.com` devient administrateur automatiquement une fois son email confirmé (voir `supabase/schema.sql`). Pour changer d'adresse, modifier les deux fonctions SQL `handle_new_user` et `grant_admin_on_confirm`.
 - **Sécurité** : chaque client ne voit que ses données (règles RLS vérifiées). Les en-têtes de sécurité (CSP, HSTS…) sont dans `netlify.toml`.
-- **RGPD** : polices et bibliothèque Supabase hébergées avec le site (`fonts/`, `vendor/`), aucun traceur.
+- **RGPD** : polices et bibliothèques (Supabase, jsPDF) hébergées avec le site (`fonts/`, `vendor/`), aucun traceur. Les PDF sont générés dans le navigateur du client : aucune donnée n'est envoyée à un tiers.
+- **Devis PDF** : `devis-pdf.js` (lignes, TVA par taux, total TTC). L'en-tête reprend les informations d'entreprise du client (Mon compte).
+- **Photos** : bucket privé `chantier-photos`, images réduites à 1600 px côté navigateur, 5 Mo max, 60 photos par chantier.
 - **CA** : le CA de l'administration est une estimation d'après l'offre attribuée à chaque client, pas des encaissements (pas de paiement en ligne pour l'instant).
 
 ## Offre Pro et abonnements (Stripe)

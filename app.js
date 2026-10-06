@@ -9,7 +9,7 @@
   const DAY = 864e5;
   const PLANS = { essentiel: { name: 'Essentiel', month: 35, year: 350 }, pro: { name: 'Pro', month: 70, year: 700 } };
   const S = { user: null, profile: null, ws: null, wp: null, role: 'owner', people: [], members: [], invites: [], clients: [], chantiers: [], devis: [], crs: [],
-    view: 'dashboard', demo: !client, planningStart: null, billingPeriod: 'month', notice: '' };
+    view: 'dashboard', demo: !client, planningStart: null, billingPeriod: 'month', notice: '', photoCh: null, photos: [], photoUrls: {}, photosReady: false, demoPhotos: [] };
 
   // ---------- Utilitaires ----------
   const $ = (id) => document.getElementById(id);
@@ -72,7 +72,7 @@
     const ch2 = { id: uid(), client_id: c2.id, title: 'Rénovation appartement', address: 'Boulogne', status: 'en_cours', progress: 45, start_date: day(-2), end_date: day(16), assigned_to: 'demo2', created_at: ago(12) };
     S.chantiers = [ch2, ch1];
     S.devis = [
-      { id: uid(), client_id: c2.id, chantier_id: ch2.id, title: 'Peinture complète', amount_ttc: 3600, status: 'envoye', sent_at: ago(9), relances_envoyees: 1, created_at: ago(9) },
+      { id: uid(), client_id: c2.id, chantier_id: ch2.id, title: 'Peinture complète', reference: 'D-2026-001', validity_days: 30, amount_ttc: 3600, lignes: [{ desc: 'Préparation et protection des surfaces', qty: 1, unit_ht: 600, tva: 10 }, { desc: 'Peinture murs et plafonds, 2 couches (m²)', qty: 80, unit_ht: 33.75, tva: 10 }], status: 'envoye', sent_at: ago(9), relances_envoyees: 1, created_at: ago(9) },
       { id: uid(), client_id: c1.id, chantier_id: ch1.id, title: 'Carrelage salle de bain', amount_ttc: 8450, status: 'envoye', sent_at: ago(4), relances_envoyees: 0, created_at: ago(4) },
       { id: uid(), client_id: c1.id, chantier_id: ch1.id, title: 'Plomberie', amount_ttc: 2200, status: 'accepte', sent_at: ago(14), decided_at: ago(10), relances_envoyees: 0, created_at: ago(14) },
       { id: uid(), client_id: c2.id, chantier_id: ch2.id, title: 'Électricité', amount_ttc: 4100, status: 'accepte', sent_at: ago(40), decided_at: ago(33), relances_envoyees: 1, created_at: ago(40) },
@@ -235,25 +235,96 @@
         return el('li', null,
           el('div', null, el('strong', { text: c.title }), el('small', { text: [(byId(S.clients, c.client_id) || {}).name, c.address, n + ' devis', r + ' compte(s) rendu(s)'].filter(Boolean).join(' · ') })),
           el('div', { class: 'd-pc' }, progress(c.progress), el('small', { text: c.progress + ' %' })), tag(STATUS_CH[c.status]),
-          el('div', { class: 'd-actions d-actions--inline' }, el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Modifier', onclick: () => editChantier(c) }),
+          el('div', { class: 'd-actions d-actions--inline' }, el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Photos', onclick: () => openPhotos(c) }), el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Modifier', onclick: () => editChantier(c) }),
             el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Supprimer', onclick: () => remove('chantiers', c, 'ce chantier') })));
       }))) : empty('Aucun chantier.', 'Créer un chantier', () => editChantier()));
   }
 
+  // ---------- Devis : formulaire détaillé, PDF, email ----------
+  const TVA_RATES = [[10, '10 %'], [20, '20 %'], [5.5, '5,5 %'], [0, '0 %']];
+  const nextReference = () => {
+    const y = new Date().getFullYear(), pre = 'D-' + y + '-';
+    const n = S.devis.filter((x) => (x.reference || '').startsWith(pre)).map((x) => parseInt(x.reference.slice(pre.length), 10) || 0);
+    return pre + String((n.length ? Math.max(...n) : 0) + 1).padStart(3, '0');
+  };
   function editDevis(d) {
     if (!guardWrite()) return;
-    openForm({ title: d ? 'Modifier le devis' : 'Nouveau devis', values: d || { status: 'brouillon' },
-      onSubmit: (v) => {
-        if (v.status === 'envoye' && !(d && d.sent_at)) v.sent_at = new Date().toISOString();
-        if (v.status === 'brouillon') { v.sent_at = null; v.relances_envoyees = 0; }
-        if ((v.status === 'accepte' || v.status === 'refuse') && !(d && d.decided_at)) v.decided_at = new Date().toISOString();
-        if (v.status === 'brouillon' || v.status === 'envoye') v.decided_at = null;
-        return d ? patch('devis', d.id, v) : add('devis', v);
-      },
-      fields: [{ name: 'title', label: 'Objet du devis', required: true }, { name: 'client_id', label: 'Client', type: 'select', options: clientOptions('Sans client') },
-        { name: 'chantier_id', label: 'Chantier', type: 'select', options: chantierOptions('Aucun') }, { name: 'amount_ttc', label: 'Montant TTC (€)', type: 'number', min: 0, step: '0.01', required: true },
-        { name: 'status', label: 'Statut', type: 'select', options: [['brouillon', 'Brouillon'], ['envoye', 'Envoyé au client'], ['accepte', 'Accepté'], ['refuse', 'Refusé']] }] });
+    const dlg = $('dlg'), form = $('dlgForm'); form.replaceChildren(); form.onsubmit = null;
+    const B = window.BFDevis;
+    const L = (d && d.lignes && d.lignes.length ? d.lignes : [{ desc: d ? d.title : '', qty: 1, unit_ht: 0, tva: 10 }]).map((x) => ({ ...x }));
+    const msg = el('p', { class: 'form__msg', role: 'alert' });
+    const f = (id, label, node) => el('div', { class: 'field' }, el('label', { for: id, text: label }), node);
+    const title = el('input', { id: 'd_title', maxlength: 200 }); title.value = d ? d.title : '';
+    const client_ = el('select', { id: 'd_client' }, clientOptions('Sans client').map(([v, l]) => el('option', { value: v, text: l, selected: String((d && d.client_id) || '') === String(v) })));
+    const chantier_ = el('select', { id: 'd_chantier' }, chantierOptions('Aucun').map(([v, l]) => el('option', { value: v, text: l, selected: String((d && d.chantier_id) || '') === String(v) })));
+    const status = el('select', { id: 'd_status' }, [['brouillon', 'Brouillon'], ['envoye', 'Envoyé au client'], ['accepte', 'Accepté'], ['refuse', 'Refusé']].map(([v, l]) => el('option', { value: v, text: l, selected: ((d && d.status) || 'brouillon') === v })));
+    const valid = el('input', { id: 'd_valid', type: 'number', min: 1, max: 365, step: 1 }); valid.value = (d && d.validity_days) || 30;
+    const notes = el('textarea', { id: 'd_notes', rows: 3, maxlength: 1000, placeholder: 'Ex. : acompte de 30 % à la commande, solde à la réception des travaux.' }); notes.value = (d && d.notes) || '';
+    const body = el('div', { class: 'dv-lines' });
+    const totals = el('div', { class: 'dv-totals', 'aria-live': 'polite' });
+    function refresh() {
+      const t = B.calc(L);
+      totals.replaceChildren(el('span', { text: 'Total HT : ' + B.money(t.ht) }), ...t.taxes.map((x) => el('span', { class: 'd-muted', text: 'TVA ' + String(x.rate).replace('.', ',') + ' % : ' + B.money(x.amount) })), el('strong', { text: 'Total TTC : ' + B.money(t.ttc) }));
+    }
+    function drawLines() {
+      body.replaceChildren(...L.map((l, i) => {
+        const inp = (key, type, ph, w) => { const x = el('input', { type, placeholder: ph, 'aria-label': ph + ' ligne ' + (i + 1), class: w, step: type === 'number' ? '0.01' : null, min: type === 'number' ? '0' : null, maxlength: type === 'text' ? 300 : null }); x.value = l[key] ?? ''; x.addEventListener('input', () => { l[key] = type === 'number' ? (x.value === '' ? '' : Number(x.value)) : x.value; refresh(); }); return x; };
+        const tva = el('select', { 'aria-label': 'TVA ligne ' + (i + 1) }, TVA_RATES.map(([v, t]) => el('option', { value: v, text: t, selected: Number(l.tva) === v }))); tva.addEventListener('change', () => { l.tva = Number(tva.value); refresh(); });
+        return el('div', { class: 'dv-line' }, inp('desc', 'text', 'Désignation', 'dv-desc'), inp('qty', 'number', 'Qté', 'dv-n'), inp('unit_ht', 'number', 'P.U. HT', 'dv-n'), tva,
+          el('button', { type: 'button', class: 'btn btn--ghost btn--sm', 'aria-label': 'Supprimer la ligne ' + (i + 1), text: '✕', disabled: L.length === 1, onclick: () => { L.splice(i, 1); drawLines(); refresh(); } }));
+      }));
+    }
+    drawLines(); refresh();
+    const ok = el('button', { type: 'submit', class: 'btn btn--primary', text: 'Enregistrer' });
+    form.append(el('h2', { text: d ? 'Modifier le devis' : 'Nouveau devis' }), f('d_title', 'Objet du devis', title), el('div', { class: 'dv-row' }, f('d_client', 'Client', client_), f('d_chantier', 'Chantier', chantier_)),
+      el('div', { class: 'field' }, el('label', { text: 'Lignes du devis' }), body, el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: '+ Ajouter une ligne', onclick: () => { L.push({ desc: '', qty: 1, unit_ht: 0, tva: L[L.length - 1] ? L[L.length - 1].tva : 10 }); drawLines(); refresh(); } })),
+      totals, el('div', { class: 'dv-row' }, f('d_status', 'Statut', status), f('d_valid', 'Validité (jours)', valid)), f('d_notes', 'Conditions et remarques (visibles sur le PDF)', notes),
+      el('p', { class: 'd-muted dv-legal', text: 'Vérifiez que votre devis contient toutes les mentions légales exigées pour votre activité (identité, assurance, délais, conditions de paiement…).' }),
+      msg, el('div', { class: 'd-actions' }, el('button', { type: 'button', class: 'btn btn--ghost', text: 'Annuler', onclick: () => dlg.close() }), ok));
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const clean = L.filter((l) => String(l.desc || '').trim()).map((l) => ({ desc: String(l.desc).trim(), qty: B.num(l.qty), unit_ht: B.num(l.unit_ht), tva: Number(l.tva) }));
+      const fail = (m) => { msg.textContent = m; msg.className = 'form__msg is-error'; };
+      if (!title.value.trim()) return fail('Merci de renseigner l\'objet du devis.');
+      if (!clean.length) return fail('Ajoutez au moins une ligne avec une désignation.');
+      if (clean.some((l) => l.qty <= 0 || l.unit_ht < 0)) return fail('Quantité et prix doivent être positifs.');
+      const t = B.calc(clean), st = status.value;
+      const v = { title: title.value.trim(), client_id: client_.value || null, chantier_id: chantier_.value || null, status: st, validity_days: Math.min(365, Math.max(1, parseInt(valid.value, 10) || 30)),
+        notes: notes.value.trim() || null, lignes: clean, amount_ttc: t.ttc, reference: (d && d.reference) || nextReference() };
+      if (st === 'envoye' && !(d && d.sent_at)) v.sent_at = new Date().toISOString();
+      if (st === 'brouillon') { v.sent_at = null; v.relances_envoyees = 0; }
+      if ((st === 'accepte' || st === 'refuse') && !(d && d.decided_at)) v.decided_at = new Date().toISOString();
+      if (st === 'brouillon' || st === 'envoye') v.decided_at = null;
+      ok.disabled = true;
+      try { if (d) await patch('devis', d.id, v); else await add('devis', v); dlg.close(); render(); }
+      catch (err) { fail('Enregistrement impossible : ' + (err && err.message ? err.message : 'erreur')); ok.disabled = false; }
+    };
+    dlg.showModal(); title.focus();
   }
+  function devisData(d) {
+    const p = S.profile, c = byId(S.clients, d.client_id) || {}, ch = byId(S.chantiers, d.chantier_id);
+    return { reference: d.reference, date: d.sent_at || d.created_at, validity_days: d.validity_days, title: d.title, notes: d.notes, lignes: d.lignes,
+      issuer: { name: p.full_name, company: p.company, address: p.company_address, siret: p.siret, tva: p.tva_mention, phone: p.phone, email: S.user.email },
+      client: { name: c.name, address: c.address, email: c.email, phone: c.phone }, chantier: ch ? { title: ch.title, address: ch.address } : null };
+  }
+  function devisFile(d) {
+    if (!d.lignes || !d.lignes.length) { alert('Ce devis n\'a pas de lignes détaillées. Ouvrez-le avec « Modifier » pour les ajouter, puis générez le PDF.'); return null; }
+    if (!S.profile.siret || !S.profile.company_address) {
+      if (!confirm('Votre SIRET ou l\'adresse de votre entreprise ne sont pas renseignés (Mon compte > Informations). Générer le PDF quand même ?')) return null;
+    }
+    try { const doc = window.BFDevis.pdf(devisData(d)); const name = (d.reference || 'devis') + '.pdf'; doc.save(name); return name; }
+    catch (e) { alert('Génération du PDF impossible : ' + e.message); return null; }
+  }
+  async function sendDevis(d) {
+    const name = devisFile(d); if (!name) return;
+    const c = byId(S.clients, d.client_id) || {}, me = [S.profile.full_name, S.profile.company].filter(Boolean).join(' – ');
+    const subject = 'Devis ' + (d.reference || '') + ' – ' + d.title;
+    const mail = 'Bonjour' + (c.name ? ' ' + c.name : '') + ',\n\nVeuillez trouver ci-joint le devis ' + (d.reference || '') + ' « ' + d.title + ' » d\'un montant de ' + money(d.amount_ttc) + ' TTC, valable ' + (d.validity_days || 30) + ' jours.\nPour l\'accepter, merci de me le retourner daté et signé avec la mention « Bon pour accord ».\n\nCordialement,\n' + me;
+    alert('Le PDF « ' + name + ' » vient d\'être téléchargé. Votre messagerie va s\'ouvrir : joignez-y ce fichier avant d\'envoyer.');
+    window.location.href = 'mailto:' + (c.email || '') + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(mail);
+    if (d.status === 'brouillon' && confirm('Marquer ce devis comme envoyé ? Les rappels de relance démarrent à partir d\'aujourd\'hui.')) await setStatus(d, 'envoye');
+  }
+
   async function setStatus(d, status) {
     if (!guardWrite()) return;
     const p = { status };
@@ -284,7 +355,8 @@
             el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Accepté', onclick: () => setStatus(d, 'accepte') }),
             el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Refusé', onclick: () => setStatus(d, 'refuse') }));
         }
-        acts.push(el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Modifier', onclick: () => editDevis(d) }), el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Supprimer', onclick: () => remove('devis', d, 'ce devis') }));
+        acts.push(el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'PDF', title: 'Télécharger le devis en PDF', onclick: () => devisFile(d) }), el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Envoyer', title: 'Télécharger le PDF et préparer l\'email', onclick: () => sendDevis(d) }),
+          el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Modifier', onclick: () => editDevis(d) }), el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Supprimer', onclick: () => remove('devis', d, 'ce devis') }));
         let note = '';
         if (r && r.finished) note = ' · 3 relances faites';
         else if (r) note = r.overdue ? ' · relance ' + r.label + ' à faire' : ' · prochaine relance ' + r.label + ' le ' + fdate(r.due);
@@ -459,9 +531,106 @@
       await new Promise((r) => setTimeout(r, 1500));
     }
   }
+  // ---------- Photos de chantier (stockage privé) ----------
+  const BUCKET = 'chantier-photos', MAX_PHOTOS = 60;
+  function openPhotos(c) { S.photoCh = c.id; S.photos = []; S.photoUrls = {}; S.photosReady = false; go('photos'); loadPhotos(c.id); }
+  async function loadPhotos(chId) {
+    try {
+      if (client) {
+        const { data, error } = await client.from('photos').select('*').eq('chantier_id', chId).order('created_at', { ascending: false });
+        if (error) throw error;
+        S.photos = data || [];
+        if (S.photos.length) {
+          const { data: urls, error: e2 } = await client.storage.from(BUCKET).createSignedUrls(S.photos.map((p) => p.path), 3600);
+          if (e2) throw e2;
+          (urls || []).forEach((u) => { if (u.signedUrl) S.photoUrls[u.path] = u.signedUrl; });
+        }
+      } else { S.photos = (S.demoPhotos || []).filter((p) => p.chantier_id === chId); S.photos.forEach((p) => { S.photoUrls[p.path] = p.url; }); }
+    } catch (e) { S.notice = 'Photos indisponibles : ' + e.message; }
+    S.photosReady = true;
+    if (S.view === 'photos' && S.photoCh === chId) render();
+  }
+  async function shrink(file) {
+    const bmp = await createImageBitmap(file), k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+    cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+    return new Promise((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error('Image illisible'))), 'image/jpeg', 0.82));
+  }
+  async function uploadPhotos(files, status) {
+    if (!guardWrite()) return;
+    const ch = S.photoCh; let done = 0, errors = 0;
+    for (const f of files) {
+      if (S.photos.length >= MAX_PHOTOS) { status.textContent = 'Limite de ' + MAX_PHOTOS + ' photos par chantier atteinte.'; break; }
+      if (!/^image\//.test(f.type)) { errors++; continue; }
+      status.textContent = 'Envoi ' + (done + errors + 1) + ' / ' + files.length + '…';
+      try {
+        const blob = await shrink(f), path = S.ws + '/' + ch + '/' + uid() + '.jpg';
+        if (client) {
+          const up = await client.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg' }); if (up.error) throw up.error;
+          const { data, error } = await client.from('photos').insert({ owner_id: S.ws, chantier_id: ch, path }).select().single();
+          if (error) { await client.storage.from(BUCKET).remove([path]); throw error; }
+          S.photos.unshift(data);
+          const { data: u } = await client.storage.from(BUCKET).createSignedUrl(path, 3600); if (u) S.photoUrls[path] = u.signedUrl;
+        } else {
+          const row = { id: uid(), chantier_id: ch, path, url: URL.createObjectURL(blob), created_at: new Date().toISOString() };
+          (S.demoPhotos = S.demoPhotos || []).unshift(row); S.photos.unshift(row); S.photoUrls[path] = row.url;
+        }
+        done++;
+      } catch (e) { errors++; status.textContent = 'Échec : ' + e.message; }
+    }
+    if (!errors) status.textContent = done + ' photo(s) ajoutée(s).';
+    render();
+  }
+  async function removePhoto(p) {
+    if (!guardWrite() || !confirm('Supprimer cette photo ?')) return;
+    try {
+      if (client) { const r = await client.storage.from(BUCKET).remove([p.path]); if (r.error) throw r.error; const { error } = await client.from('photos').delete().eq('id', p.id); if (error) throw error; }
+      else S.demoPhotos = (S.demoPhotos || []).filter((x) => x.id !== p.id);
+      S.photos = S.photos.filter((x) => x.id !== p.id); render();
+    } catch (e) { alert('Suppression impossible : ' + e.message); }
+  }
+  function lightbox(url) {
+    const dlg = $('dlg'), form = $('dlgForm'); form.replaceChildren(); form.onsubmit = null;
+    form.append(el('img', { src: url, alt: 'Photo du chantier', class: 'ph-big' }), el('div', { class: 'd-actions' }, el('button', { type: 'button', class: 'btn btn--primary', text: 'Fermer', onclick: () => dlg.close() })));
+    dlg.showModal();
+  }
+  function viewPhotos() {
+    const c = byId(S.chantiers, S.photoCh);
+    if (!c) return el('div', null, head('Photos'), empty('Chantier introuvable.', 'Retour aux chantiers', () => go('chantiers')));
+    const status = el('small', { class: 'd-muted', role: 'status', text: 'Formats JPEG, PNG ou WebP. Les images sont réduites automatiquement.' });
+    const input = el('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp', multiple: true, id: 'phFiles', class: 'ph-input', 'aria-label': 'Ajouter des photos', onchange: (e) => { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) uploadPhotos(fs, status); } });
+    return el('div', null,
+      el('div', { class: 'd-hello' }, el('div', null, el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: '← Chantiers', onclick: () => go('chantiers') }), el('h1', { text: 'Photos · ' + c.title })),
+        el('label', { class: 'btn btn--primary', for: 'phFiles', text: '+ Ajouter des photos' })), input,
+      el('div', { class: 'd-card' }, status,
+        !S.photosReady ? el('p', { class: 'd-muted', text: 'Chargement…' }) :
+          S.photos.length ? el('div', { class: 'ph-grid' }, S.photos.map((p) => el('figure', { class: 'ph-item' },
+            S.photoUrls[p.path] ? el('button', { type: 'button', class: 'ph-thumb', 'aria-label': 'Agrandir la photo du ' + fdate(p.created_at), onclick: () => lightbox(S.photoUrls[p.path]) }, el('img', { src: S.photoUrls[p.path], alt: 'Photo du ' + fdate(p.created_at), loading: 'lazy' })) : el('div', { class: 'ph-thumb ph-missing', text: 'Indisponible' }),
+            el('figcaption', null, el('small', { text: fdate(p.created_at) }), el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Supprimer', onclick: () => removePhoto(p) }))))) :
+            empty('Aucune photo pour ce chantier.', null)));
+  }
+
+  // ---------- Informations de l'entreprise (utilisées sur les devis) ----------
+  function paintUser() {
+    const p = S.profile;
+    $('uname').textContent = p.full_name || 'Votre compte';
+    $('ucompany').textContent = S.role === 'member' ? 'Équipe de ' + (S.wp.full_name || '') : p.company || p.trade || '';
+    $('avatar').textContent = ((p.full_name || S.user.email || '?').trim()[0] || '?').toUpperCase();
+  }
+  function editCompany() {
+    openForm({ title: 'Mes informations', submitLabel: 'Enregistrer', values: S.profile,
+      fields: [{ name: 'full_name', label: 'Nom et prénom', required: true }, { name: 'company', label: 'Entreprise' }, { name: 'trade', label: 'Métier' }, { name: 'phone', label: 'Téléphone', type: 'tel' },
+        { name: 'company_address', label: 'Adresse de l\'entreprise (sur les devis)' }, { name: 'siret', label: 'SIRET (sur les devis)' }, { name: 'tva_mention', label: 'Mention TVA (ex. : N° TVA FR12 345678901, ou « TVA non applicable, art. 293 B du CGI »)' }],
+      onSubmit: async (v) => {
+        if (client) { const { data, error } = await client.from('profiles').update(v).eq('id', S.user.id).select().single(); if (error) throw error; Object.assign(S.profile, data); } else Object.assign(S.profile, v);
+        if (S.role === 'owner') S.wp = S.profile;
+        paintUser();
+      } });
+  }
+
   function exportData() {
     const data = { exporte_le: new Date().toISOString(), profil: { nom: S.profile.full_name, entreprise: S.profile.company, metier: S.profile.trade, email: S.user.email, telephone: S.profile.phone },
-      clients: S.clients, chantiers: S.chantiers, devis: S.devis, comptes_rendus: S.crs };
+      clients: S.clients, chantiers: S.chantiers, devis: S.devis, comptes_rendus: S.crs, photos: 'Les photos se téléchargent une par une depuis la fiche de chaque chantier.' };
     const a = el('a', { href: URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })), download: 'batiflow-export.json' });
     document.body.append(a); a.click(); a.remove();
   }
@@ -472,6 +641,11 @@
         if (v.confirm !== 'SUPPRIMER') throw new Error('Tapez exactement SUPPRIMER');
         if (!client) { location.href = 'index.html'; return; }
         if (S.profile.stripe_subscription_id) { try { await billing('cancel_now'); } catch { /* abonnement déjà arrêté ou paiement non activé */ } }
+        if (S.role === 'owner') {
+          const { data: ph } = await client.from('photos').select('path').eq('owner_id', S.user.id);
+          const paths = (ph || []).map((x) => x.path);
+          for (let i = 0; i < paths.length; i += 100) { const r = await client.storage.from(BUCKET).remove(paths.slice(i, i + 100)); if (r.error) throw r.error; }
+        }
         const { error } = await client.rpc('delete_my_account'); if (error) throw error;
         await client.auth.signOut(); location.href = 'index.html';
       } });
@@ -504,9 +678,11 @@
     return el('div', null, head('Mon compte'),
       S.notice ? el('p', { class: 'd-banner d-banner--info', role: 'status', text: S.notice }) : null,
       el('div', { class: 'd-card' }, el('h2', { text: 'Informations' }), el('ul', { class: 'd-kv' },
-        row('Nom', p.full_name), row('Entreprise', p.company), row('Métier', p.trade), row('Email', S.user.email), row('Téléphone', p.phone), row('Offre', planName + (own ? '' : ' (équipe)')),
+        row('Nom', p.full_name), row('Entreprise', p.company), row('Métier', p.trade), row('Email', S.user.email), row('Téléphone', p.phone), row('Adresse', p.company_address), row('SIRET', p.siret), row('Mention TVA', p.tva_mention), row('Offre', planName + (own ? '' : ' (équipe)')),
         w.plan === 'trial' ? row('Fin de l\'essai', fdate(w.trial_ends_at)) : null,
-        sub && p.current_period_end ? row(p.cancel_at_period_end ? 'Se termine le' : 'Prochain renouvellement', fdate(p.current_period_end)) : null)),
+        sub && p.current_period_end ? row(p.cancel_at_period_end ? 'Se termine le' : 'Prochain renouvellement', fdate(p.current_period_end)) : null),
+        el('p', { class: 'd-muted', text: 'Votre adresse, votre SIRET et votre mention de TVA apparaissent sur vos devis PDF.' }),
+        el('div', { class: 'd-actions d-actions--inline' }, el('button', { type: 'button', class: 'btn btn--ghost', text: 'Modifier mes informations', onclick: editCompany }))),
       own ? el('div', { class: 'd-card' }, el('h2', { text: 'Abonnement' }),
         el('div', { class: 'billing', role: 'group', 'aria-label': 'Période de facturation' }, ['month', 'year'].map((k) => el('button', { type: 'button', class: 'billing__btn' + (per === k ? ' is-active' : ''), 'aria-pressed': String(per === k), text: k === 'month' ? 'Mensuel' : 'Annuel',
           onclick: () => { S.billingPeriod = k; render(); } }))),
@@ -529,7 +705,7 @@
   }
 
   // ---------- Rendu général ----------
-  const VIEWS = { dashboard: viewDashboard, chantiers: viewChantiers, devis: viewDevis, crs: viewCrs, clients: viewClients, planning: viewPlanning, stats: viewStats, team: viewTeam, account: viewAccount };
+  const VIEWS = { dashboard: viewDashboard, chantiers: viewChantiers, devis: viewDevis, crs: viewCrs, clients: viewClients, planning: viewPlanning, stats: viewStats, team: viewTeam, account: viewAccount, photos: viewPhotos };
   function banner() {
     const b = $('banner'); b.replaceChildren();
     if (S.demo) b.append(el('p', { class: 'd-banner d-banner--info', text: 'Mode démonstration : données d\'exemple, rien n\'est enregistré.' }));
@@ -539,7 +715,7 @@
   function render() {
     banner();
     $('view').replaceChildren(VIEWS[S.view]());
-    document.querySelectorAll('#sideNav button').forEach((b) => b.classList.toggle('is-active', b.dataset.view === S.view));
+    document.querySelectorAll('#sideNav button').forEach((b) => b.classList.toggle('is-active', b.dataset.view === (S.view === 'photos' ? 'chantiers' : S.view)));
     const w = S.wp, left = S.demo || w.plan !== 'trial' ? null : trialLeft();
     $('trial').textContent = S.demo ? 'Démonstration' : w.plan === 'essentiel' ? 'Offre Essentiel' : w.plan === 'pro' ? 'Offre Pro' : w.plan === 'annule' ? 'Abonnement résilié' : left > 0 ? 'Essai gratuit : ' + left + ' jour' + (left > 1 ? 's' : '') + ' restant' + (left > 1 ? 's' : '') : 'Essai terminé';
     $('trial').classList.toggle('is-over', !S.demo && !canWrite());
@@ -570,29 +746,30 @@
     S.user = user; S.profile = profile; S.ws = user.id; S.wp = profile; S.role = 'owner';
     if (client) {
       // Membre d'une équipe Pro : on travaille dans l'espace du responsable.
-      const { data: mem } = await client.from('team_members').select('owner_id').eq('member_id', user.id).maybeSingle();
-      if (mem) {
-        const { data: ownerProf } = await client.from('profiles').select('*').eq('id', mem.owner_id).maybeSingle();
-        if (ownerProf && ownerProf.plan === 'pro') { S.ws = mem.owner_id; S.wp = ownerProf; S.role = 'member'; }
-        else S.notice = 'L\'équipe de ' + ((ownerProf && ownerProf.full_name) || 'votre responsable') + ' n\'a plus l\'offre Pro : vous retrouvez votre espace personnel.';
-      }
+      try {
+        const { data: mem } = await client.from('team_members').select('owner_id').eq('member_id', user.id).maybeSingle();
+        if (mem) {
+          const { data: ownerProf } = await client.from('profiles').select('*').eq('id', mem.owner_id).maybeSingle();
+          if (ownerProf && ownerProf.plan === 'pro') { S.ws = mem.owner_id; S.wp = ownerProf; S.role = 'member'; }
+          else S.notice = 'L\'équipe de ' + ((ownerProf && ownerProf.full_name) || 'votre responsable') + ' n\'a plus l\'offre Pro : vous retrouvez votre espace personnel.';
+        }
+      } catch { S.notice = 'Votre équipe n\'a pas pu être chargée : vous êtes dans votre espace personnel.'; }
     } else {
       S.people = [{ id: 'demo', full_name: 'Thomas Lefèvre', email: 'demo@batiflow.test' }, { id: 'demo2', full_name: 'Sophie Bernard', email: 'sophie@example.com' }];
       S.members = [{ owner_id: 'demo', member_id: 'demo2' }];
     }
-    $('uname').textContent = profile.full_name || 'Votre compte';
-    $('ucompany').textContent = S.role === 'member' ? 'Équipe de ' + (S.wp.full_name || '') : profile.company || profile.trade || '';
-    $('avatar').textContent = ((profile.full_name || user.email || '?').trim()[0] || '?').toUpperCase();
+    paintUser();
     // Lien d'administration : créé uniquement pour un administrateur, absent du HTML des clients.
     if (profile.is_admin) $('sideNav').append(el('a', { href: 'admin.html', text: 'Administration' }));
     if (CFG.CONTACT_EMAIL) $('helpLink').href = 'mailto:' + CFG.CONTACT_EMAIL;
-    try { await load(); await loadTeam(); } catch (e) { $('view').replaceChildren(el('p', { class: 'd-banner d-banner--warn', text: 'Chargement impossible : ' + e.message })); document.body.hidden = false; return; }
+    try { await load(); } catch (e) { $('view').replaceChildren(el('p', { class: 'd-banner d-banner--warn', text: 'Chargement impossible : ' + e.message })); document.body.hidden = false; return; }
     const q = new URLSearchParams(location.search).get('paiement');
     if (q) {
       history.replaceState(null, '', location.pathname);
       if (q === 'ok') { S.view = 'account'; S.notice = 'Paiement reçu, merci ! Votre offre est en cours d\'activation…'; document.body.hidden = false; render(); await refreshProfile((d) => d.plan === 'essentiel' || d.plan === 'pro'); S.notice = (S.wp.plan === 'pro' || S.wp.plan === 'essentiel') ? 'Votre abonnement est actif. Merci !' : 'Activation en cours : actualisez la page dans un instant.'; render(); return; }
       if (q === 'annule') { S.view = 'account'; S.notice = 'Paiement annulé : aucun montant n\'a été débité.'; }
     }
+    try { await loadTeam(); } catch { /* l'équipe est facultative */ }
     document.body.hidden = false;
     render();
   }
@@ -603,5 +780,5 @@
     S.view = b.dataset.view; render(); window.scrollTo(0, 0);
   });
   $('logout').addEventListener('click', async () => { if (client) await client.auth.signOut(); location.href = 'index.html'; });
-  start();
+  start().catch((e) => { document.body.hidden = false; $('view').replaceChildren(el('p', { class: 'd-banner d-banner--warn', text: 'Une erreur est survenue : ' + (e && e.message ? e.message : 'réessayez plus tard') + '. Actualisez la page.' })); });
 })();

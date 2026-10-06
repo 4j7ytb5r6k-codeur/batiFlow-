@@ -13,6 +13,7 @@ create table if not exists public.profiles (
   billing       text not null default 'month' check (billing in ('month','year')),
   trial_ends_at timestamptz not null default (now() + interval '7 days'),
   is_admin      boolean not null default false,
+  company_address text, siret text, tva_mention text,
   stripe_customer_id text, stripe_subscription_id text,
   cancel_at_period_end boolean not null default false, current_period_end timestamptz,
   created_at    timestamptz not null default now()
@@ -87,6 +88,8 @@ create table public.devis (
   title text not null,
   amount_ttc numeric(12,2) not null default 0 check (amount_ttc >= 0),
   status text not null default 'brouillon' check (status in ('brouillon','envoye','accepte','refuse')),
+  reference text, validity_days int not null default 30 check (validity_days between 1 and 365), notes text,
+  lignes jsonb not null default '[]'::jsonb,
   sent_at timestamptz, decided_at timestamptz,
   relances_envoyees int not null default 0 check (relances_envoyees between 0 and 3),
   created_at timestamptz not null default now());
@@ -222,3 +225,41 @@ create trigger contact_set_user before insert on public.contact_messages for eac
 -- NOTE : sur le projet actuel, les anciennes policies « clients_own », « chantiers_own », « devis_own » et « comptes_rendus_own »
 -- existent encore (leurs « drop policy » n'ont pas pu être exécutés via le connecteur). Elles sont incluses dans les nouvelles
 -- règles et sans danger ; vous pouvez les supprimer dans le SQL Editor : drop policy "clients_own" on public.clients; etc.
+
+-- ============ Informations d'entreprise modifiables par le client (protégées) ============
+-- Un client ne peut modifier que ses coordonnées : offre, essai, rôle admin, email et champs Stripe sont verrouillés par ce déclencheur
+-- (seuls un administrateur ou le serveur peuvent les changer). Testé : un client ne peut ni changer d'offre ni se rendre administrateur.
+create or replace function public.profiles_guard() returns trigger language plpgsql set search_path = public as $$
+begin
+  if auth.uid() is not null and not public.is_admin() and (
+       new.plan is distinct from old.plan or new.billing is distinct from old.billing or new.trial_ends_at is distinct from old.trial_ends_at
+    or new.is_admin is distinct from old.is_admin or new.email is distinct from old.email or new.id is distinct from old.id
+    or new.stripe_customer_id is distinct from old.stripe_customer_id or new.stripe_subscription_id is distinct from old.stripe_subscription_id
+    or new.cancel_at_period_end is distinct from old.cancel_at_period_end or new.current_period_end is distinct from old.current_period_end) then
+    raise exception 'Modification non autorisee';
+  end if;
+  return new;
+end; $$;
+create trigger profiles_guard_trg before update on public.profiles for each row execute function public.profiles_guard();
+create policy "profiles_update_own" on public.profiles for update to authenticated using (id = (select auth.uid())) with check (id = (select auth.uid()));
+grant update (full_name, company, trade, phone, company_address, siret, tva_mention) on public.profiles to authenticated;
+
+-- ============ Photos de chantier (stockage privé, isolé par espace de travail) ============
+create table public.photos (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users (id) on delete cascade,
+  chantier_id uuid not null references public.chantiers (id) on delete cascade,
+  path text not null unique,
+  created_at timestamptz not null default now());
+alter table public.photos enable row level security;
+create policy "photos_workspace" on public.photos for all to authenticated using (public.can_access(owner_id)) with check (public.can_access(owner_id));
+revoke all on public.photos from anon, authenticated;
+grant select, insert, update, delete on public.photos to authenticated;
+create index photos_owner_idx on public.photos (owner_id);
+create index photos_chantier_idx on public.photos (chantier_id);
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('chantier-photos', 'chantier-photos', false, 5242880, array['image/jpeg','image/png','image/webp']) on conflict (id) do nothing;
+-- Chemin des fichiers : <id de l'espace de travail>/<id du chantier>/<fichier>.jpg
+create policy "chantier_photos_workspace" on storage.objects for all to authenticated
+  using (bucket_id = 'chantier-photos' and case when (storage.foldername(name))[1] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then public.can_access(((storage.foldername(name))[1])::uuid) else false end)
+  with check (bucket_id = 'chantier-photos' and case when (storage.foldername(name))[1] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then public.can_access(((storage.foldername(name))[1])::uuid) else false end);
