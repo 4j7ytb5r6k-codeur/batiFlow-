@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BatiFlow – Compte rendu de chantier</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 16px; background: #f4f5f7; color: #1d2433;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-size: 17px; line-height: 1.45;
+    }
+    main { max-width: 640px; margin: 0 auto; }
+    h1 { font-size: 24px; margin: 4px 0 4px; }
+    .sous-titre { margin: 0 0 20px; color: #5b6475; }
+    label { display: block; font-weight: 600; margin: 16px 0 6px; }
+    input, textarea {
+      width: 100%; padding: 12px; font: inherit; color: inherit;
+      border: 1px solid #c3c9d4; border-radius: 10px; background: #fff;
+    }
+    textarea { min-height: 150px; resize: vertical; }
+    button {
+      width: 100%; margin-top: 20px; padding: 16px; font: inherit; font-weight: 700;
+      color: #fff; background: #d9640a; border: 0; border-radius: 10px; cursor: pointer;
+    }
+    button:disabled { opacity: .6; cursor: wait; }
+    button.secondaire { background: #1d2433; }
+    .erreur {
+      margin-top: 16px; padding: 12px; border-radius: 10px;
+      background: #fde8e8; color: #8a1c1c; display: none;
+    }
+    #resultat { display: none; margin-top: 32px; }
+    #resultat h2 { font-size: 20px; margin: 0 0 4px; }
+    .astuce { color: #5b6475; font-size: 15px; margin: 0 0 8px; }
+    .rubrique textarea { min-height: 80px; overflow: hidden; resize: none; }
+    .rubrique label { margin-top: 18px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🏗️ BatiFlow</h1>
+  <p class="sous-titre">Compte rendu de chantier en quelques secondes</p>
+
+  <form id="formulaire">
+    <label for="chantier">Nom du chantier</label>
+    <input id="chantier" required maxlength="200" placeholder="Ex : Rénovation salle de bain – M. Dupont">
+
+    <label for="date">Date</label>
+    <input id="date" type="date" required>
+
+    <label for="note">Ta note de fin de journée</label>
+    <textarea id="note" required maxlength="8000"
+      placeholder="Écris comme tu parles, même en vrac. Ex : carrelage mur nord fini, fuite sur l'arrivée d'eau à refaire, il me faut 2 sacs de colle demain, client doit choisir la couleur des joints"></textarea>
+
+    <button id="bouton-generer" type="submit">Générer le compte rendu</button>
+  </form>
+
+  <div id="erreur" class="erreur" role="alert"></div>
+
+  <section id="resultat">
+    <h2>Compte rendu</h2>
+    <p class="astuce">Relis-le : tu peux corriger chaque rubrique avant de télécharger le PDF.</p>
+    <div id="rubriques"></div>
+    <button id="bouton-pdf" class="secondaire" type="button">Télécharger en PDF</button>
+  </section>
+</main>
+
+<script src="/vendor/jspdf/jspdf.umd.min.js"></script>
+<script>
+  // Les 5 rubriques : clé renvoyée par le serveur + titre affiché
+  const RUBRIQUES = [
+    ["travaux_realises", "1. Travaux réalisés"],
+    ["problemes_rencontres", "2. Problèmes rencontrés"],
+    ["prochaines_etapes", "3. Prochaines étapes"],
+    ["materiel_a_prevoir", "4. Matériel à prévoir"],
+    ["points_a_valider_client", "5. Points à valider avec le client"],
+  ];
+
+  const formulaire = document.getElementById("formulaire");
+  const boutonGenerer = document.getElementById("bouton-generer");
+  const boutonPdf = document.getElementById("bouton-pdf");
+  const zoneErreur = document.getElementById("erreur");
+  const zoneResultat = document.getElementById("resultat");
+  const zoneRubriques = document.getElementById("rubriques");
+
+  // Date du jour pré-remplie (heure locale du téléphone, pas UTC)
+  const aujourdhui = new Date();
+  document.getElementById("date").value =
+    aujourdhui.getFullYear() + "-" +
+    String(aujourdhui.getMonth() + 1).padStart(2, "0") + "-" +
+    String(aujourdhui.getDate()).padStart(2, "0");
+
+  function afficherErreur(message) {
+    zoneErreur.textContent = message;
+    zoneErreur.style.display = message ? "block" : "none";
+  }
+
+  function ajusterHauteur(zone) {
+    zone.style.height = "auto";
+    zone.style.height = zone.scrollHeight + 4 + "px";
+  }
+
+  function afficherRubriques(donnees) {
+    zoneRubriques.innerHTML = "";
+    for (const [cle, titre] of RUBRIQUES) {
+      const bloc = document.createElement("div");
+      bloc.className = "rubrique";
+      const label = document.createElement("label");
+      label.textContent = titre;
+      label.htmlFor = "rub-" + cle;
+      const zone = document.createElement("textarea");
+      zone.id = "rub-" + cle;
+      zone.value = donnees[cle] ?? "Rien à signaler";
+      zone.addEventListener("input", () => ajusterHauteur(zone));
+      bloc.append(label, zone);
+      zoneRubriques.append(bloc);
+    }
+    zoneResultat.style.display = "block";
+    zoneRubriques.querySelectorAll("textarea").forEach(ajusterHauteur);
+    zoneResultat.scrollIntoView({ behavior: "smooth" });
+  }
+
+  formulaire.addEventListener("submit", async (evenement) => {
+    evenement.preventDefault(); // empêche le rechargement de la page
+    afficherErreur("");
+    boutonGenerer.disabled = true;
+    boutonGenerer.textContent = "Génération en cours…";
+    try {
+      const reponse = await fetch("/api/compte-rendu", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chantier: document.getElementById("chantier").value.trim(),
+          date: document.getElementById("date").value,
+          note: document.getElementById("note").value,
+        }),
+      });
+      const donnees = await reponse.json();
+      if (!reponse.ok) throw new Error(donnees.erreur || "Erreur inconnue");
+      afficherRubriques(donnees);
+    } catch (erreur) {
+      afficherErreur(erreur.message || "Impossible de contacter le serveur.");
+    } finally {
+      boutonGenerer.disabled = false;
+      boutonGenerer.textContent = "Générer le compte rendu";
+    }
+  });
+
+  boutonPdf.addEventListener("click", () => {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: "mm", format: "a4" });
+    const marge = 18;
+    const largeur = 210 - 2 * marge;
+    let y = marge;
+
+    // Ajoute du texte, avec retour à la ligne et nouvelle page si besoin
+    function ecrire(texte, taille, gras, espaceApres) {
+      pdf.setFont("helvetica", gras ? "bold" : "normal");
+      pdf.setFontSize(taille);
+      const hauteurLigne = taille * 0.5;
+      for (const ligne of pdf.splitTextToSize(texte, largeur)) {
+        if (y > 297 - marge) { pdf.addPage(); y = marge; }
+        pdf.text(ligne, marge, y);
+        y += hauteurLigne;
+      }
+      y += espaceApres;
+    }
+
+    const chantier = document.getElementById("chantier").value.trim() || "Chantier";
+    const dateIso = document.getElementById("date").value;
+    const dateLisible = dateIso
+      ? new Date(dateIso + "T12:00:00").toLocaleDateString("fr-FR", {
+          weekday: "long", day: "numeric", month: "long", year: "numeric" })
+      : "";
+
+    ecrire("Compte rendu de chantier", 20, true, 4);
+    ecrire("Chantier : " + chantier, 12, false, 1);
+    ecrire("Date : " + dateLisible, 12, false, 8);
+
+    for (const [cle, titre] of RUBRIQUES) {
+      ecrire(titre, 13, true, 1);
+      ecrire(document.getElementById("rub-" + cle).value.trim() || "Rien à signaler", 11, false, 6);
+    }
+
+    // Nom de fichier sans accents ni caractères spéciaux
+    const nomSimple = chantier.normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+    pdf.save("compte-rendu-" + (nomSimple || "chantier") + "-" + dateIso + ".pdf");
+  });
+</script>
+</body>
+</html>
