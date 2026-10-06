@@ -153,7 +153,17 @@ billingBtns.forEach((btn) => {
       b.classList.toggle('is-active', on);
       b.setAttribute('aria-pressed', String(on));
     });
-    document.querySelectorAll('[data-price]').forEach((el) => { el.textContent = el.dataset[period]; });
+    document.querySelectorAll('[data-price]').forEach((el) => {
+      const to = Number(el.dataset[period]);
+      if (reduceMotion.matches) { el.textContent = to; return; }
+      const from = Number(el.textContent);
+      const t0 = performance.now();
+      (function step(now) {
+        const t = Math.min((now - t0) / 600, 1);
+        el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - t, 3)));
+        if (t < 1) requestAnimationFrame(step);
+      })(t0);
+    });
     document.querySelectorAll('[data-billed]').forEach((el) => { el.textContent = el.dataset[period]; });
   });
 });
@@ -183,4 +193,22 @@ if (!reduceMotion.matches) {
     if (!ticking) { ticking = true; requestAnimationFrame(updateProgress); }
   }, { passive: true });
   updateProgress();
+}
+
+// Inclinaison 3D de la maquette selon la souris
+if (!reduceMotion.matches && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+  const app = document.querySelector('.app');
+  const zone = document.querySelector('.hero');
+  let raf = 0;
+  zone.addEventListener('pointermove', (e) => {
+    const r = app.getBoundingClientRect();
+    const nx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / (window.innerWidth / 2)));
+    const ny = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / (window.innerHeight / 2)));
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      const angle = Math.min(Math.hypot(nx, ny), 1) * 7;
+      app.style.rotate = angle < 0.05 ? 'none' : (-ny).toFixed(3) + ' ' + nx.toFixed(3) + ' 0 ' + angle.toFixed(2) + 'deg';
+    });
+  });
+  zone.addEventListener('pointerleave', () => { cancelAnimationFrame(raf); app.style.rotate = 'none'; });
 }

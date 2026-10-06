@@ -15,6 +15,10 @@ ul,ol{padding:0;list-style:none}
 
 /* Boutons */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-weight:700;border:2px solid transparent;border-radius:12px;padding:12px 22px;cursor:pointer;transition:background-color .2s,border-color .2s,box-shadow .2s,translate .25s cubic-bezier(.2,.8,.2,1);translate:var(--mx,0) var(--my,0);will-change:translate}
+.btn{position:relative;overflow:hidden}
+.btn--primary::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);transform:translateX(-120%);pointer-events:none}
+.wave{display:flex;align-items:center;gap:4px;height:34px;margin-top:14px}
+.wave i{display:block;width:4px;height:100%;border-radius:4px;background:var(--blue);opacity:.75;transform:scaleY(.25)}
 .btn--primary{background:var(--blue);color:#fff;box-shadow:0 6px 18px rgba(37,99,235,.35)}
 .btn--primary:hover{background:var(--blue-d)}
 .btn--ghost{background:#fff;color:var(--blue);border-color:#c9d7fb}
@@ -187,6 +191,34 @@ input:focus,select:focus{outline:3px solid #c9d7fb;border-color:var(--blue)}
 }
 /* Animations (uniquement si l'utilisateur ne les a pas désactivées) */
 @media (prefers-reduced-motion:no-preference){
+  /* Titre : dégradé animé */
+  h1 em{background:linear-gradient(90deg,#2563eb,#1fb5a8,#7aa5ff,#2563eb);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;animation:shimmer 7s linear infinite}
+  /* Maquette : flottement, inclinaison 3D à la souris, barres qui se remplissent */
+  .hero__inner{perspective:1400px}
+  .app{animation:float 6s ease-in-out infinite;transition:rotate .25s ease-out,opacity .8s,transform .8s}
+  .app .bar i{transform-origin:left;animation:grow 1.4s cubic-bezier(.2,.7,.2,1) .8s backwards}
+  /* Boutons : reflet au survol */
+  .btn--primary:hover::after{transform:translateX(120%);transition:transform .8s ease}
+  /* Micro : ondes sonores */
+  .wave i{animation:eq 1.1s ease-in-out infinite}
+  .wave i:nth-child(2){animation-delay:.12s}.wave i:nth-child(3){animation-delay:.24s}.wave i:nth-child(4){animation-delay:.36s}
+  .wave i:nth-child(5){animation-delay:.48s}.wave i:nth-child(6){animation-delay:.6s}.wave i:nth-child(7){animation-delay:.72s}
+  .wave i:nth-child(8){animation-delay:.84s}.wave i:nth-child(9){animation-delay:.96s}
+  /* Chronologie des relances et liste de fichiers : apparition en séquence */
+  .js .timeline li,.js .files li{opacity:0;transform:translate3d(-18px,0,0);transition:opacity .6s ease,transform .6s cubic-bezier(.2,.7,.2,1)}
+  .js .feature.is-visible .timeline li,.js .feature.is-visible .files li{opacity:1;transform:none}
+  .js .feature.is-visible .timeline li:nth-child(1),.js .feature.is-visible .files li:nth-child(1){transition-delay:.5s}
+  .js .feature.is-visible .timeline li:nth-child(2),.js .feature.is-visible .files li:nth-child(2){transition-delay:.8s}
+  .js .feature.is-visible .timeline li:nth-child(3),.js .feature.is-visible .files li:nth-child(3){transition-delay:1.1s}
+  .js .feature.is-visible .timeline li:nth-child(4),.js .feature.is-visible .files li:nth-child(4){transition-delay:1.4s}
+  .js .feature.is-visible .files li:nth-child(5){transition-delay:1.7s}
+  .js .feature.is-visible .files li:nth-child(6){transition-delay:2s}
+  .js .feature.is-visible .files li:nth-child(7){transition-delay:2.3s}
+  /* Cartes : relief au survol, icône qui rebondit */
+  .js .card.reveal{transition:opacity .8s cubic-bezier(.2,.7,.2,1),transform .8s cubic-bezier(.2,.7,.2,1),translate .3s ease,box-shadow .3s ease;transition-delay:var(--d,0ms),var(--d,0ms),0ms,0ms}
+  .card:hover{translate:0 -6px;box-shadow:0 18px 40px rgba(15,29,54,.14)}
+  .card:hover .ico,.card:hover .step{animation:pop .55s ease}
+
   .hero::before{animation:drift1 16s ease-in-out infinite alternate;will-change:transform}
   .hero::after{animation:drift2 20s ease-in-out infinite alternate;will-change:transform}
   .js .reveal{opacity:0;transform:translate3d(0,32px,0);transition:opacity .8s cubic-bezier(.2,.7,.2,1),transform .8s cubic-bezier(.2,.7,.2,1);transition-delay:var(--d,0ms)}
@@ -196,6 +228,11 @@ input:focus,select:focus{outline:3px solid #c9d7fb;border-color:var(--blue)}
   .js .section__title::after{transform:scaleX(0);transition:transform .8s cubic-bezier(.2,.7,.2,1) .35s}
   .js .section__title.is-visible::after{transform:scaleX(1)}
 }
+@keyframes shimmer{to{background-position:-250% 0}}
+@keyframes float{50%{translate:0 -10px}}
+@keyframes grow{from{transform:scaleX(0)}}
+@keyframes eq{50%{transform:scaleY(1)}}
+@keyframes pop{40%{transform:scale(1.18) rotate(-6deg)}}
 @keyframes drift1{to{transform:translate3d(-12vmax,10vmax,0) scale(1.15)}}
 @keyframes drift2{to{transform:translate3d(14vmax,-8vmax,0) scale(1.2)}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.btn{translate:none!important}}
