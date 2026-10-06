@@ -62,6 +62,9 @@
   function render() {
     const s = stats(), q = state.q.trim().toLowerCase();
     const list = state.profiles.filter((p) => !q || [p.full_name, p.company, p.email, p.trade, p.phone].some((x) => (x || '').toLowerCase().includes(q)));
+    const planOf = (m) => (state.profiles.find((p) => p.id === m.user_id) || {}).plan;
+    const isPro = (m) => planOf(m) === 'pro';
+    const inbox = [...state.messages].sort((a, b) => (a.handled - b.handled) || (isPro(b) - isPro(a)) || (new Date(b.created_at) - new Date(a.created_at)));
     const open = state.messages.filter((m) => !m.handled).length;
     root.replaceChildren(
       el('h1', { text: 'Tableau de bord administrateur' }),
@@ -75,7 +78,7 @@
         el('div', { class: 'a-scroll' }, el('table', { class: 'a-table' },
           el('thead', null, el('tr', null, ['Client', 'Contact', 'Inscrit le', 'Offre', 'Facturation', 'Fin d\'essai'].map((h) => el('th', { scope: 'col', text: h })))),
           el('tbody', null, list.map((p) => el('tr', null,
-            el('td', null, el('strong', { text: p.full_name || '—' }), el('small', { text: [p.company, p.trade].filter(Boolean).join(' · ') }), p.is_admin ? el('em', { class: 'tag tag--blue', text: 'admin' }) : null),
+            el('td', null, el('strong', { text: p.full_name || '—' }), el('small', { text: [p.company, p.trade].filter(Boolean).join(' · ') }), p.is_admin ? el('em', { class: 'tag tag--blue', text: 'admin' }) : null, p.stripe_subscription_id ? el('em', { class: 'tag tag--green', text: p.cancel_at_period_end ? 'Stripe · résilie' : 'Stripe' }) : null),
             el('td', null, el('a', { href: 'mailto:' + (p.email || ''), text: p.email || '—' }), el('small', { text: p.phone || '' })),
             el('td', { text: fdate(p.created_at) }),
             el('td', null, sel([['trial', 'Essai'], ['essentiel', 'Essentiel'], ['pro', 'Pro'], ['annule', 'Résilié']], p.plan, (v) => updateProfile(p.id, { plan: v }), 'Offre de ' + (p.full_name || p.email))),
@@ -84,8 +87,8 @@
               onclick: () => updateProfile(p.id, { trial_ends_at: new Date(Math.max(Date.now(), new Date(p.trial_ends_at).getTime()) + 7 * DAY).toISOString() }) }))))))),
         list.length ? null : el('p', { class: 'd-muted', text: 'Aucun client ne correspond.' })),
       el('div', { class: 'd-card' }, el('h2', { text: 'Messages reçus (' + open + ' à traiter)' }),
-        state.messages.length ? el('ul', { class: 'd-rows d-rows--wide' }, state.messages.map((m) => el('li', { class: 'd-cr' + (m.handled ? ' is-done' : '') },
-          el('div', null, el('strong', { text: m.name + ' · ' + fdate(m.created_at) }), el('small', null, el('a', { href: 'mailto:' + m.email + '?subject=' + encodeURIComponent('Votre message à batiFlow'), text: m.email })), el('p', { class: 'd-crtext', text: m.message })),
+        inbox.length ? el('ul', { class: 'd-rows d-rows--wide' }, inbox.map((m) => el('li', { class: 'd-cr' + (m.handled ? ' is-done' : '') },
+          el('div', null, el('strong', { text: m.name + ' · ' + fdate(m.created_at) }), isPro(m) ? el('em', { class: 'pro', text: 'Pro · prioritaire' }) : null, el('small', null, el('a', { href: 'mailto:' + m.email + '?subject=' + encodeURIComponent('Votre message à batiFlow'), text: m.email })), el('p', { class: 'd-crtext', text: m.message })),
           el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: m.handled ? 'Rouvrir' : 'Marquer traité', onclick: () => toggleHandled(m) })))) : el('p', { class: 'd-muted', text: 'Aucun message pour le moment.' })));
   }
 

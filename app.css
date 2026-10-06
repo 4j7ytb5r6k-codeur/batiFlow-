@@ -141,3 +141,30 @@
 .a-bar small{color:var(--muted);font-size:.7rem;margin-top:4px}
 .is-done{opacity:.55}
 @media (max-width:820px){.adm__top{padding:12px 16px}}
+
+/* ---- Offre Pro : étiquettes, planning, abonnement ---- */
+.pro{font-style:normal;font-size:.62rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;background:#ffd45c;color:#5a3d00;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+.pro--lg{font-size:.75rem;padding:3px 10px;margin:0 0 10px;display:inline-block}
+.d-lock{display:grid;justify-items:start;gap:10px;padding:28px}
+.d-line{grid-template-columns:1fr auto auto!important}
+.d-offers{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin:14px 0}
+.d-offer{display:grid;gap:8px;align-content:start}
+.d-offer.is-current{border:2px solid var(--blue)}
+.d-price b{font-size:1.9rem;color:var(--navy)}
+.d-card .billing{margin:4px 0 8px}
+.pl-nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.pl-nav strong{flex:1;text-align:center;min-width:180px}
+.pl-scroll{overflow-x:auto;padding-bottom:6px}
+.pl-grid{display:grid;grid-template-columns:150px repeat(var(--cols),minmax(26px,1fr));min-width:calc(150px + var(--cols) * 26px);align-items:center;gap:0}
+.pl-corner{position:sticky;left:0;background:#fff}
+.pl-day{display:grid;justify-items:center;padding:4px 0;border-left:1px solid var(--line);font-size:.78rem;color:var(--muted)}
+.pl-day small{font-size:.65rem}
+.pl-day.is-we{background:#f1f4fa}
+.pl-day.is-today{background:#e3ebff;color:var(--blue-d);font-weight:800;border-radius:8px 8px 0 0}
+.pl-group{grid-column:1 / -1;font-weight:800;color:var(--navy);padding:12px 0 4px;border-bottom:1px solid var(--line);font-size:.9rem}
+.pl-label{position:sticky;left:0;background:#fff;padding:8px 8px 8px 0;font-weight:600;font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;z-index:1}
+.pl-bar{border:0;border-radius:8px;padding:6px 8px;margin:4px 1px;color:#fff;font:inherit;font-weight:700;font-size:.78rem;cursor:pointer;text-align:left;overflow:hidden;white-space:nowrap}
+.pl-bar--en_cours{background:var(--blue)}.pl-bar--a_venir{background:#7a8bb0}.pl-bar--termine{background:var(--green)}
+.pl-bar:focus-visible{outline:3px solid #c9d7fb;outline-offset:1px}
+.pl-off{font-size:.8rem;color:var(--muted);padding:8px 0}
+@media (max-width:640px){.d-offers{grid-template-columns:1fr}}

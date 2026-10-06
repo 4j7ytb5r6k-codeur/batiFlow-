@@ -30,6 +30,20 @@ Pages : `login.html` (connexion), `app.html` (espace client : clients, chantiers
 - **RGPD** : polices et bibliothèque Supabase hébergées avec le site (`fonts/`, `vendor/`), aucun traceur.
 - **CA** : le CA de l'administration est une estimation d'après l'offre attribuée à chaque client, pas des encaissements (pas de paiement en ligne pour l'instant).
 
+## Offre Pro et abonnements (Stripe)
+
+- **Offre Pro** (déjà en place) : équipe jusqu'à 5 utilisateurs (Équipe), planning partagé avec chantiers assignés (Planning), statistiques détaillées (Statistiques), support prioritaire (messages marqués « Pro » dans l'administration). Pendant l'essai de 7 jours, le Pro est inclus pour pouvoir le tester.
+- **Changement d'offre sans contact** : depuis « Mon compte », le client souscrit, change d'offre (prorata automatique), résilie ou reprend son abonnement, et accède à ses factures. Cela passe par les fonctions Supabase `billing` et `stripe-webhook` (dossier `supabase/functions/`, déjà déployées).
+- **Tant que Stripe n'est pas configuré**, ces boutons affichent « Le paiement en ligne n'est pas encore activé ». Activation :
+  1. Créez un compte sur https://stripe.com et activez le mode test (puis le mode production quand tout est validé).
+  2. Stripe > Développeurs > Clés API : copiez la clé secrète (`sk_test_...`).
+  3. Supabase > Edge Functions > Secrets : ajoutez `STRIPE_SECRET_KEY` (la clé), `SITE_URL` (l'adresse du site, ex. `https://batiflow.fr`, plusieurs adresses séparées par des virgules).
+  4. Stripe > Développeurs > Webhooks > Ajouter un point de terminaison : URL `https://yvdkrrkrxiizyelivtlv.supabase.co/functions/v1/stripe-webhook`, événements `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`. Copiez la clé de signature (`whsec_...`) dans le secret Supabase `STRIPE_WEBHOOK_SECRET`.
+  5. Stripe > Paramètres > Billing > Portail client : activez le portail (moyen de paiement et factures).
+  6. Testez avec la carte `4242 4242 4242 4242`. Les produits « batiFlow Essentiel » et « batiFlow Pro » sont créés automatiquement au premier paiement.
+- Les prix (35 € / 70 € TTC par mois, 350 € / 700 € par an) sont définis dans `supabase/functions/*/lib.ts` (`PRICES`) **et** dans le site (`index.html`, `app.js`) : modifiez-les aux deux endroits.
+- **L'administration** (`admin.html`) reste utilisable pour attribuer une offre à la main (offre offerte, geste commercial).
+
 À faire côté Supabase (Authentication > URL Configuration) : renseigner l'adresse du site dans « Site URL » et « Redirect URLs ». Pour la production, configurer un SMTP (Authentication > SMTP Settings).
 
 À compléter dans le site avant de vendre : `mentions-legales.html`, `cgv.html`, `confidentialite.html` (passages surlignés `[À COMPLÉTER]`), puis faire relire par un juriste.

@@ -7,7 +7,9 @@
   const TABLE = { clients: 'clients', chantiers: 'chantiers', devis: 'devis', crs: 'comptes_rendus' };
   const STEPS = [3, 7, 14];
   const DAY = 864e5;
-  const S = { user: null, profile: null, clients: [], chantiers: [], devis: [], crs: [], view: 'dashboard', demo: !client };
+  const PLANS = { essentiel: { name: 'Essentiel', month: 35, year: 350 }, pro: { name: 'Pro', month: 70, year: 700 } };
+  const S = { user: null, profile: null, ws: null, wp: null, role: 'owner', people: [], members: [], invites: [], clients: [], chantiers: [], devis: [], crs: [],
+    view: 'dashboard', demo: !client, planningStart: null, billingPeriod: 'month', notice: '' };
 
   // ---------- Utilitaires ----------
   const $ = (id) => document.getElementById(id);
@@ -43,7 +45,7 @@
   }
   async function add(k, row) {
     if (!client) { const r = { id: uid(), created_at: new Date().toISOString(), ...row }; S[k].unshift(r); return r; }
-    const { data, error } = await client.from(TABLE[k]).insert(row).select().single();
+    const { data, error } = await client.from(TABLE[k]).insert({ ...row, owner_id: S.ws }).select().single();
     if (error) throw error;
     S[k].unshift(data); return data;
   }
@@ -65,30 +67,39 @@
     const c1 = { id: uid(), name: 'M. Dupont', email: 'dupont@example.com', phone: '06 12 34 56 78', address: 'Paris 11e', created_at: ago(20) };
     const c2 = { id: uid(), name: 'Mme Martin', email: 'martin@example.com', phone: '', address: 'Boulogne', created_at: ago(15) };
     S.clients = [c2, c1];
-    const ch1 = { id: uid(), client_id: c1.id, title: 'Rénovation salle de bain', address: 'Paris 11e', status: 'en_cours', progress: 70, created_at: ago(18) };
-    const ch2 = { id: uid(), client_id: c2.id, title: 'Rénovation appartement', address: 'Boulogne', status: 'en_cours', progress: 45, created_at: ago(12) };
+    const day = (n) => new Date(Date.now() + n * DAY).toISOString().slice(0, 10);
+    const ch1 = { id: uid(), client_id: c1.id, title: 'Rénovation salle de bain', address: 'Paris 11e', status: 'en_cours', progress: 70, start_date: day(-6), end_date: day(5), assigned_to: 'demo', created_at: ago(18) };
+    const ch2 = { id: uid(), client_id: c2.id, title: 'Rénovation appartement', address: 'Boulogne', status: 'en_cours', progress: 45, start_date: day(-2), end_date: day(16), assigned_to: 'demo2', created_at: ago(12) };
     S.chantiers = [ch2, ch1];
     S.devis = [
       { id: uid(), client_id: c2.id, chantier_id: ch2.id, title: 'Peinture complète', amount_ttc: 3600, status: 'envoye', sent_at: ago(9), relances_envoyees: 1, created_at: ago(9) },
       { id: uid(), client_id: c1.id, chantier_id: ch1.id, title: 'Carrelage salle de bain', amount_ttc: 8450, status: 'envoye', sent_at: ago(4), relances_envoyees: 0, created_at: ago(4) },
-      { id: uid(), client_id: c1.id, chantier_id: ch1.id, title: 'Plomberie', amount_ttc: 2200, status: 'accepte', sent_at: ago(14), relances_envoyees: 0, created_at: ago(14) },
+      { id: uid(), client_id: c1.id, chantier_id: ch1.id, title: 'Plomberie', amount_ttc: 2200, status: 'accepte', sent_at: ago(14), decided_at: ago(10), relances_envoyees: 0, created_at: ago(14) },
+      { id: uid(), client_id: c2.id, chantier_id: ch2.id, title: 'Électricité', amount_ttc: 4100, status: 'accepte', sent_at: ago(40), decided_at: ago(33), relances_envoyees: 1, created_at: ago(40) },
+      { id: uid(), client_id: c2.id, chantier_id: null, title: 'Terrasse', amount_ttc: 6900, status: 'refuse', sent_at: ago(30), decided_at: ago(24), relances_envoyees: 2, created_at: ago(30) },
     ];
     S.crs = [{ id: uid(), chantier_id: ch1.id, content: 'Dépose de l\'ancien carrelage terminée. Début de la pose demain matin.', created_at: ago(1) }];
   }
 
-  // ---------- Droits d'écriture (essai / offre) ----------
-  const trialLeft = () => Math.ceil((new Date(S.profile.trial_ends_at) - Date.now()) / DAY);
+  // ---------- Droits d'écriture et offre Pro (d'après l'espace de travail : le vôtre, ou celui de votre équipe) ----------
+  const trialLeft = (p = S.wp) => Math.ceil((new Date(p.trial_ends_at) - Date.now()) / DAY);
   function canWrite() {
-    const p = S.profile;
-    if (S.demo || p.is_admin) return true;
+    const p = S.wp;
+    if (S.demo || S.profile.is_admin || p.is_admin) return true;
     if (p.plan === 'essentiel' || p.plan === 'pro') return true;
     return p.plan === 'trial' && trialLeft() > 0;
   }
+  // Le Pro est inclus pendant l'essai pour pouvoir le tester.
+  function hasPro() {
+    const p = S.wp;
+    return S.demo || S.profile.is_admin || p.is_admin || p.plan === 'pro' || (p.plan === 'trial' && trialLeft() > 0);
+  }
   function guardWrite() {
     if (canWrite()) return true;
-    alert("Votre essai est terminé : l'espace est en lecture seule. Contactez-nous pour souscrire.");
+    alert("Votre essai est terminé : l'espace est en lecture seule. Choisissez une offre dans « Mon compte ».");
     return false;
   }
+  const personName = (id) => { const p = S.people.find((x) => x.id === id); return p ? (p.full_name || p.email || 'Collègue') : ''; };
 
   // ---------- Relances ----------
   function relance(d) {
@@ -206,10 +217,16 @@
 
   function editChantier(c) {
     if (!guardWrite()) return;
-    openForm({ title: c ? 'Modifier le chantier' : 'Nouveau chantier', values: c || { status: 'a_venir', progress: 0 }, onSubmit: (v) => (c ? patch('chantiers', c.id, v) : add('chantiers', v)),
-      fields: [{ name: 'title', label: 'Intitulé', required: true }, { name: 'client_id', label: 'Client', type: 'select', options: clientOptions('Sans client') }, { name: 'address', label: 'Adresse du chantier' },
-        { name: 'status', label: 'Statut', type: 'select', options: [['a_venir', 'À venir'], ['en_cours', 'En cours'], ['termine', 'Terminé']] },
-        { name: 'progress', label: 'Avancement (%)', type: 'number', min: 0, max: 100, step: 5 }] });
+    const fields = [{ name: 'title', label: 'Intitulé', required: true }, { name: 'client_id', label: 'Client', type: 'select', options: clientOptions('Sans client') }, { name: 'address', label: 'Adresse du chantier' },
+      { name: 'status', label: 'Statut', type: 'select', options: [['a_venir', 'À venir'], ['en_cours', 'En cours'], ['termine', 'Terminé']] },
+      { name: 'progress', label: 'Avancement (%)', type: 'number', min: 0, max: 100, step: 5 },
+      { name: 'start_date', label: 'Début (planning)', type: 'date' }, { name: 'end_date', label: 'Fin prévue (planning)', type: 'date' }];
+    if (hasPro() && S.people.length > 1) fields.push({ name: 'assigned_to', label: 'Assigné à', type: 'select', options: [['', 'Non assigné'], ...S.people.map((p) => [p.id, personName(p.id)])] });
+    openForm({ title: c ? 'Modifier le chantier' : 'Nouveau chantier', values: c || { status: 'a_venir', progress: 0 },
+      onSubmit: (v) => {
+        if (v.start_date && v.end_date && v.end_date < v.start_date) throw new Error('La fin doit être après le début');
+        return c ? patch('chantiers', c.id, v) : add('chantiers', v);
+      }, fields });
   }
   function viewChantiers() {
     return el('div', null, head('Chantiers', '+ Nouveau chantier', () => editChantier()),
@@ -229,6 +246,8 @@
       onSubmit: (v) => {
         if (v.status === 'envoye' && !(d && d.sent_at)) v.sent_at = new Date().toISOString();
         if (v.status === 'brouillon') { v.sent_at = null; v.relances_envoyees = 0; }
+        if ((v.status === 'accepte' || v.status === 'refuse') && !(d && d.decided_at)) v.decided_at = new Date().toISOString();
+        if (v.status === 'brouillon' || v.status === 'envoye') v.decided_at = null;
         return d ? patch('devis', d.id, v) : add('devis', v);
       },
       fields: [{ name: 'title', label: 'Objet du devis', required: true }, { name: 'client_id', label: 'Client', type: 'select', options: clientOptions('Sans client') },
@@ -238,7 +257,8 @@
   async function setStatus(d, status) {
     if (!guardWrite()) return;
     const p = { status };
-    if (status === 'envoye') { p.sent_at = new Date().toISOString(); p.relances_envoyees = 0; }
+    if (status === 'envoye') { p.sent_at = new Date().toISOString(); p.relances_envoyees = 0; p.decided_at = null; }
+    if (status === 'accepte' || status === 'refuse') p.decided_at = new Date().toISOString();
     try { await patch('devis', d.id, p); render(); } catch (e) { alert('Action impossible : ' + e.message); }
   }
   async function doRelance(d) {
@@ -310,7 +330,135 @@
           el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Supprimer', onclick: () => remove('crs', c, 'ce compte rendu') })))))) : null);
   }
 
-  // ---------- Mon compte : export et suppression ----------
+  // ---------- Fonctions Pro : verrouillage ----------
+  function locked(title, text) {
+    return el('div', null, head(title),
+      el('div', { class: 'd-card d-lock' }, el('span', { class: 'pro pro--lg', text: 'Pro' }), el('h2', { text: 'Fonction de l\'offre Pro' }), el('p', { class: 'd-muted', text: text }),
+        el('button', { type: 'button', class: 'btn btn--primary', text: 'Voir les offres', onclick: () => go('account') })));
+  }
+  const go = (v) => { S.view = v; render(); window.scrollTo(0, 0); };
+
+  // ---------- Planning partagé (Pro) ----------
+  const WEEKS = 4;
+  const isoDay = (d) => d.toISOString().slice(0, 10);
+  const mondayOf = (d) => { const x = new Date(d); x.setUTCHours(0, 0, 0, 0); const wd = (x.getUTCDay() + 6) % 7; x.setUTCDate(x.getUTCDate() - wd); return x; };
+  function viewPlanning() {
+    if (!hasPro()) return locked('Planning', 'Visualisez tous vos chantiers sur un calendrier partagé avec votre équipe, et assignez chaque chantier à un collègue.');
+    if (!S.planningStart) S.planningStart = mondayOf(new Date());
+    const start = S.planningStart, nDays = WEEKS * 7, days = [];
+    for (let i = 0; i < nDays; i++) { const d = new Date(start); d.setUTCDate(d.getUTCDate() + i); days.push(d); }
+    const idx = (iso) => Math.round((new Date(iso + 'T00:00:00Z') - start) / DAY);
+    const today = isoDay(new Date());
+    const dated = S.chantiers.filter((c) => c.start_date || c.end_date);
+    const undated = S.chantiers.filter((c) => !c.start_date && !c.end_date && c.status !== 'termine');
+    const groups = new Map();
+    dated.forEach((c) => { const k = c.assigned_to || ''; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(c); });
+    const keys = [...groups.keys()].sort((a, b) => (a === '' ? 1 : b === '' ? -1 : personName(a).localeCompare(personName(b))));
+    const grid = el('div', { class: 'pl-grid', style: '--cols:' + nDays });
+    grid.append(el('div', { class: 'pl-corner' }), ...days.map((d) => { const iso = isoDay(d), wd = (d.getUTCDay() + 6) % 7;
+      return el('div', { class: 'pl-day' + (wd >= 5 ? ' is-we' : '') + (iso === today ? ' is-today' : ''), title: fdate(d) }, el('small', { text: 'LMMJVSD'[wd] }), el('b', { text: d.getUTCDate() })); }));
+    let rows = 0;
+    for (const k of keys) {
+      grid.append(el('div', { class: 'pl-group', text: k ? personName(k) || 'Collègue' : 'Non assigné' }));
+      for (const c of groups.get(k)) {
+        const s0 = c.start_date || c.end_date, e0 = c.end_date || c.start_date;
+        let a = idx(s0), b = idx(e0);
+        grid.append(el('div', { class: 'pl-label', text: c.title }));
+        if (b < 0 || a >= nDays) { grid.append(el('div', { class: 'pl-off', style: 'grid-column:2 / -1', text: 'Hors de la période affichée (' + fdate(s0) + (e0 !== s0 ? ' → ' + fdate(e0) : '') + ')' })); rows++; continue; }
+        a = Math.max(a, 0); b = Math.min(b, nDays - 1);
+        grid.append(el('button', { type: 'button', class: 'pl-bar pl-bar--' + c.status, style: 'grid-column:' + (a + 2) + ' / ' + (b + 3), title: c.title + ' · ' + fdate(s0) + ' → ' + fdate(e0), onclick: () => editChantier(c), text: c.progress + ' %' }));
+        rows++;
+      }
+    }
+    const shift = (n) => () => { const d = new Date(S.planningStart); d.setUTCDate(d.getUTCDate() + n); S.planningStart = d; render(); };
+    return el('div', null, head('Planning', '+ Nouveau chantier', () => editChantier()),
+      el('div', { class: 'd-card' },
+        el('div', { class: 'pl-nav' }, el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: '◀ Précédent', onclick: shift(-14) }),
+          el('strong', { text: fdate(days[0]) + ' – ' + fdate(days[nDays - 1]) }),
+          el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Suivant ▶', onclick: shift(14) }),
+          el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Aujourd\'hui', onclick: () => { S.planningStart = mondayOf(new Date()); render(); } })),
+        rows ? el('div', { class: 'pl-scroll' }, grid) : el('p', { class: 'd-muted', text: 'Aucun chantier daté. Renseignez un début et une fin dans la fiche d\'un chantier pour le voir ici.' }),
+        undated.length ? el('p', { class: 'd-muted', text: 'Sans dates : ' + undated.map((c) => c.title).join(', ') + '.' }) : null));
+  }
+
+  // ---------- Statistiques détaillées (Pro) ----------
+  function viewStats() {
+    if (!hasPro()) return locked('Statistiques', 'Suivez votre taux d\'acceptation, votre panier moyen, votre chiffre d\'affaires par mois et vos meilleurs clients.');
+    const acc = S.devis.filter((d) => d.status === 'accepte'), ref = S.devis.filter((d) => d.status === 'refuse'), wait = S.devis.filter((d) => d.status === 'envoye');
+    const sum = (l) => l.reduce((s, d) => s + Number(d.amount_ttc), 0);
+    const decided = acc.length + ref.length;
+    const delays = [...acc, ...ref].filter((d) => d.sent_at && d.decided_at).map((d) => (new Date(d.decided_at) - new Date(d.sent_at)) / DAY);
+    const avgDelay = delays.length ? delays.reduce((a, b) => a + b, 0) / delays.length : null;
+    const months = [];
+    for (let i = 5; i >= 0; i--) { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - i); months.push({ key: d.toISOString().slice(0, 7), label: new Intl.DateTimeFormat('fr-FR', { month: 'short' }).format(d), v: 0 }); }
+    acc.forEach((d) => { const m = months.find((x) => x.key === (d.decided_at || d.created_at || '').slice(0, 7)); if (m) m.v += Number(d.amount_ttc); });
+    const max = Math.max(1, ...months.map((m) => m.v));
+    const perClient = new Map(); acc.forEach((d) => { const n = (byId(S.clients, d.client_id) || {}).name || 'Sans client'; perClient.set(n, (perClient.get(n) || 0) + Number(d.amount_ttc)); });
+    const top = [...perClient.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const stat = (v, l, h) => el('div', { class: 'd-card' }, el('b', { text: v }), el('span', { text: l }), h ? el('small', { class: 'd-muted', text: h }) : null);
+    const byStatus = ['a_venir', 'en_cours', 'termine'].map((k) => [STATUS_CH[k][0], S.chantiers.filter((c) => c.status === k).length]);
+    return el('div', null, head('Statistiques'),
+      el('section', { class: 'd-stats' }, stat(decided ? Math.round((acc.length / decided) * 100) + ' %' : '—', 'Taux d\'acceptation', acc.length + ' acceptés · ' + ref.length + ' refusés'),
+        stat(acc.length ? money(sum(acc) / acc.length) : '—', 'Panier moyen (devis acceptés)'), stat(avgDelay == null ? '—' : Math.round(avgDelay * 10) / 10 + ' j', 'Délai moyen de décision'), stat(money(sum(wait)), 'En attente de réponse', wait.length + ' devis')),
+      el('div', { class: 'd-card' }, el('h2', { text: 'Chiffre d\'affaires accepté par mois (TTC)' }),
+        el('div', { class: 'a-bars', role: 'img', 'aria-label': months.map((m) => m.label + ' ' + money(m.v)).join(', ') }, months.map((m) => el('div', { class: 'a-bar' }, el('i', { style: 'height:' + Math.round((m.v / max) * 100) + '%', title: m.label + ' : ' + money(m.v) }), el('small', { text: m.label }))))),
+      el('section', { class: 'd-lists' },
+        el('article', { class: 'd-card' }, el('h2', { text: 'Meilleurs clients' }), top.length ? el('ul', { class: 'd-rows' }, top.map(([n, v]) => el('li', { class: 'd-line' }, el('strong', { text: n }), el('b', { text: money(v) })))) : el('p', { class: 'd-muted', text: 'Aucun devis accepté pour le moment.' })),
+        el('article', { class: 'd-card' }, el('h2', { text: 'Chantiers par statut' }), el('ul', { class: 'd-rows' }, byStatus.map(([l, n]) => el('li', { class: 'd-line' }, el('strong', { text: l }), el('b', { text: n })))))));
+  }
+
+  // ---------- Équipe (Pro) ----------
+  async function reloadTeam() { await loadTeam(); render(); }
+  function viewTeam() {
+    if (!hasPro()) return locked('Équipe', 'Travaillez à plusieurs sur les mêmes clients, chantiers et devis : jusqu\'à 5 utilisateurs avec l\'offre Pro.');
+    const owner = S.role === 'owner';
+    const seats = 1 + S.members.length + S.invites.length;
+    const row = (name, sub, tagEl, actions) => el('li', { class: 'd-line' }, el('div', null, el('strong', { text: name }), el('small', { text: sub })), tagEl, actions);
+    const invite = () => openForm({ title: 'Inviter un collègue', submitLabel: 'Inviter', fields: [{ name: 'email', label: 'Email de votre collègue', type: 'email', required: true }],
+      onSubmit: async (v) => {
+        if (S.demo) { S.invites.push({ id: uid(), email: v.email }); return; }
+        const { error } = await client.from('team_invites').insert({ email: v.email });
+        if (error) throw new Error(/Limite/.test(error.message) ? 'Limite de 5 utilisateurs atteinte' : /duplicate/.test(error.message) ? 'Cette personne est déjà invitée' : error.message);
+        await loadTeam();
+      } });
+    const removeMember = async (m) => { if (!confirm('Retirer ' + (personName(m.member_id) || 'ce collègue') + ' de l\'équipe ?')) return; if (!S.demo) { const { error } = await client.from('team_members').delete().eq('member_id', m.member_id); if (error) { alert(error.message); return; } } S.members = S.members.filter((x) => x !== m); await reloadTeam(); };
+    const cancelInvite = async (i) => { if (!S.demo) { const { error } = await client.from('team_invites').delete().eq('id', i.id); if (error) { alert(error.message); return; } } S.invites = S.invites.filter((x) => x.id !== i.id); render(); };
+    const leave = async () => { if (!confirm('Quitter cette équipe ? Vous n\'aurez plus accès à ses données.')) return; const { error } = await client.from('team_members').delete().eq('member_id', S.user.id); if (error) { alert(error.message); return; } location.reload(); };
+    return el('div', null, head('Équipe', owner ? '+ Inviter un collègue' : null, invite),
+      el('div', { class: 'd-card' }, el('h2', { text: 'Utilisateurs (' + seats + ' / 5)' }),
+        el('p', { class: 'd-muted', text: owner ? 'Votre collègue crée son compte batiFlow avec l\'adresse invitée et rejoint automatiquement votre équipe : vous partagez les mêmes clients, chantiers, devis et comptes rendus.' : 'Vous travaillez dans l\'équipe de ' + (S.wp.full_name || 'votre responsable') + '.' }),
+        el('ul', { class: 'd-rows' },
+          row(owner ? (S.profile.full_name || 'Vous') : (S.wp.full_name || 'Responsable'), owner ? S.user.email : S.wp.email || '', el('em', { class: 'tag tag--blue', text: owner ? 'Vous · responsable' : 'Responsable' })),
+          S.members.map((m) => row(personName(m.member_id) || 'Collègue', (S.people.find((p) => p.id === m.member_id) || {}).email || '', el('em', { class: 'tag tag--green', text: m.member_id === S.user.id ? 'Vous' : 'Actif' }),
+            owner ? el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Retirer', onclick: () => removeMember(m) }) : null)),
+          S.invites.map((i) => row(i.email, 'Invitation envoyée : en attente de création de compte', el('em', { class: 'tag tag--gray', text: 'En attente' }), owner ? el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Annuler', onclick: () => cancelInvite(i) }) : null))),
+        !owner && !S.demo ? el('div', { class: 'd-actions d-actions--inline' }, el('button', { type: 'button', class: 'btn btn--ghost', text: 'Quitter l\'équipe', onclick: leave })) : null));
+  }
+
+  // ---------- Mon compte : abonnement, support, données ----------
+  async function billing(action, extra = {}) {
+    if (S.demo) { alert('Mode démonstration : le paiement n\'est pas actif.'); return null; }
+    const { data, error } = await client.functions.invoke('billing', { body: { action, return_url: location.origin + location.pathname, ...extra } });
+    if (error) {
+      let m = error.message || 'Erreur';
+      try { const j = await error.context.json(); if (j && j.error) m = j.error; } catch { /* corps non lisible */ }
+      throw new Error(m === 'not_configured' ? 'Le paiement en ligne n\'est pas encore activé. Écrivez-nous pour souscrire.' : m);
+    }
+    return data;
+  }
+  async function pay(action, extra) {
+    try { const r = await billing(action, extra); if (!r) return; if (r.url) { location.href = r.url; return; } S.notice = r.message || 'Modification enregistrée.'; await refreshProfile(); render(); }
+    catch (e) { alert(e.message); }
+  }
+  async function refreshProfile(waitFor) {
+    if (!client) return;
+    for (let i = 0; i < (waitFor ? 12 : 1); i++) {
+      const { data } = await client.from('profiles').select('*').eq('id', S.user.id).maybeSingle();
+      if (data) { S.profile = data; if (S.role === 'owner') S.wp = data; }
+      if (!waitFor || (data && waitFor(data))) return;
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
   function exportData() {
     const data = { exporte_le: new Date().toISOString(), profil: { nom: S.profile.full_name, entreprise: S.profile.company, metier: S.profile.trade, email: S.user.email, telephone: S.profile.phone },
       clients: S.clients, chantiers: S.chantiers, devis: S.devis, comptes_rendus: S.crs };
@@ -323,22 +471,56 @@
       onSubmit: async (v) => {
         if (v.confirm !== 'SUPPRIMER') throw new Error('Tapez exactement SUPPRIMER');
         if (!client) { location.href = 'index.html'; return; }
+        if (S.profile.stripe_subscription_id) { try { await billing('cancel_now'); } catch { /* abonnement déjà arrêté ou paiement non activé */ } }
         const { error } = await client.rpc('delete_my_account'); if (error) throw error;
         await client.auth.signOut(); location.href = 'index.html';
       } });
   }
+  function supportForm() {
+    openForm({ title: 'Support prioritaire', submitLabel: 'Envoyer', fields: [{ name: 'message', label: 'Votre message', type: 'textarea', required: true }],
+      onSubmit: async (v) => {
+        if (S.demo) return;
+        const { error } = await client.from('contact_messages').insert({ name: S.profile.full_name || S.user.email, email: S.user.email, message: v.message });
+        if (error) throw error;
+        S.notice = 'Message envoyé : il est traité en priorité.';
+      } });
+  }
   function viewAccount() {
-    const p = S.profile, plan = { trial: 'Essai gratuit', essentiel: 'Essentiel', pro: 'Pro', annule: 'Résilié' }[p.plan] || p.plan;
+    const p = S.profile, w = S.wp, own = S.role === 'owner';
+    const planName = { trial: 'Essai gratuit', essentiel: 'Essentiel', pro: 'Pro', annule: 'Résilié' }[w.plan] || w.plan;
     const row = (l, v) => el('li', null, el('span', { class: 'd-muted', text: l }), el('strong', { text: v || '—' }));
+    const per = S.billingPeriod;
+    const offer = (key) => {
+      const o = PLANS[key], cur = w.plan === key && (w.billing || 'month') === per, same = w.plan === key;
+      const label = cur ? 'Offre actuelle' : same ? 'Passer en ' + (per === 'year' ? 'annuel' : 'mensuel') : (w.plan === 'essentiel' || w.plan === 'pro') ? (key === 'pro' ? 'Passer au Pro' : 'Passer à l\'Essentiel') : 'Choisir ' + o.name;
+      const price = per === 'year' ? o.year : o.month;
+      return el('article', { class: 'd-card d-offer' + (cur ? ' is-current' : '') }, el('h3', { text: o.name }),
+        el('p', { class: 'd-price' }, el('b', { text: money(price) }), ' TTC / ' + (per === 'year' ? 'an' : 'mois')),
+        el('small', { class: 'd-muted', text: per === 'year' ? 'soit ' + money(Math.round(o.year / 12)) + ' / mois, 2 mois offerts' : 'Sans engagement' }),
+        el('button', { type: 'button', class: 'btn ' + (cur ? 'btn--ghost' : 'btn--primary') + ' btn--block', disabled: cur || !own, text: label,
+          onclick: () => pay(p.stripe_subscription_id ? 'change' : 'checkout', { plan: key, billing: per }) }));
+    };
+    const sub = p.stripe_subscription_id && (w.plan === 'essentiel' || w.plan === 'pro');
     return el('div', null, head('Mon compte'),
+      S.notice ? el('p', { class: 'd-banner d-banner--info', role: 'status', text: S.notice }) : null,
       el('div', { class: 'd-card' }, el('h2', { text: 'Informations' }), el('ul', { class: 'd-kv' },
-        row('Nom', p.full_name), row('Entreprise', p.company), row('Métier', p.trade), row('Email', S.user.email), row('Téléphone', p.phone), row('Offre', plan),
-        p.plan === 'trial' ? row('Fin de l\'essai', fdate(p.trial_ends_at)) : null)),
+        row('Nom', p.full_name), row('Entreprise', p.company), row('Métier', p.trade), row('Email', S.user.email), row('Téléphone', p.phone), row('Offre', planName + (own ? '' : ' (équipe)')),
+        w.plan === 'trial' ? row('Fin de l\'essai', fdate(w.trial_ends_at)) : null,
+        sub && p.current_period_end ? row(p.cancel_at_period_end ? 'Se termine le' : 'Prochain renouvellement', fdate(p.current_period_end)) : null)),
+      own ? el('div', { class: 'd-card' }, el('h2', { text: 'Abonnement' }),
+        el('div', { class: 'billing', role: 'group', 'aria-label': 'Période de facturation' }, ['month', 'year'].map((k) => el('button', { type: 'button', class: 'billing__btn' + (per === k ? ' is-active' : ''), 'aria-pressed': String(per === k), text: k === 'month' ? 'Mensuel' : 'Annuel',
+          onclick: () => { S.billingPeriod = k; render(); } }))),
+        el('div', { class: 'd-offers' }, offer('essentiel'), offer('pro')),
+        el('p', { class: 'd-muted', text: 'Paiement sécurisé. Vous pouvez changer d\'offre ou résilier à tout moment, sans nous contacter.' + (w.plan === 'trial' ? ' Si votre essai est en cours, le premier paiement a lieu à sa fin.' : '') }),
+        sub ? el('div', { class: 'd-actions d-actions--inline' }, el('button', { type: 'button', class: 'btn btn--ghost', text: 'Moyen de paiement et factures', onclick: () => pay('portal') }),
+          p.cancel_at_period_end ? el('button', { type: 'button', class: 'btn btn--primary', text: 'Reprendre mon abonnement', onclick: () => pay('resume') })
+            : el('button', { type: 'button', class: 'btn btn--ghost', text: 'Résilier à la fin de la période', onclick: () => { if (confirm('Résilier votre abonnement ? Il reste actif jusqu\'à la fin de la période déjà payée.')) pay('cancel'); } })) : null)
+        : el('div', { class: 'd-card' }, el('h2', { text: 'Abonnement' }), el('p', { class: 'd-muted', text: 'L\'abonnement est géré par le responsable de l\'équipe.' })),
+      hasPro() ? el('div', { class: 'd-card' }, el('h2', { text: 'Support prioritaire' }), el('p', { class: 'd-muted', text: 'Votre message est traité en priorité par notre équipe.' }),
+        el('div', { class: 'd-actions d-actions--inline' }, el('button', { type: 'button', class: 'btn btn--ghost', text: 'Écrire au support', onclick: supportForm }))) : null,
       el('div', { class: 'd-card' }, el('h2', { text: 'Vos données' }), el('p', { class: 'd-muted', text: 'Vos données vous appartiennent : exportez-les ou supprimez votre compte à tout moment.' }),
         el('div', { class: 'd-actions d-actions--inline' }, el('button', { type: 'button', class: 'btn btn--ghost', text: 'Exporter mes données (JSON)', onclick: exportData }),
-          el('button', { type: 'button', class: 'btn btn--ghost', text: 'Supprimer mon compte', onclick: deleteAccount }))),
-      el('div', { class: 'd-card' }, el('h2', { text: 'Abonnement' }), el('p', { class: 'd-muted', text: 'Pour souscrire ou changer d\'offre, contactez-nous.' }),
-        el('a', { class: 'btn btn--primary', href: 'mailto:' + (CFG.CONTACT_EMAIL || '') + '?subject=' + encodeURIComponent('Abonnement batiFlow'), text: 'Écrire à ' + (CFG.CONTACT_EMAIL || 'batiFlow') })));
+          el('button', { type: 'button', class: 'btn btn--ghost', text: 'Supprimer mon compte', onclick: deleteAccount }))));
   }
 
   async function remove(k, item, label) {
@@ -347,37 +529,70 @@
   }
 
   // ---------- Rendu général ----------
-  const VIEWS = { dashboard: viewDashboard, chantiers: viewChantiers, devis: viewDevis, crs: viewCrs, clients: viewClients, account: viewAccount };
+  const VIEWS = { dashboard: viewDashboard, chantiers: viewChantiers, devis: viewDevis, crs: viewCrs, clients: viewClients, planning: viewPlanning, stats: viewStats, team: viewTeam, account: viewAccount };
   function banner() {
     const b = $('banner'); b.replaceChildren();
     if (S.demo) b.append(el('p', { class: 'd-banner d-banner--info', text: 'Mode démonstration : données d\'exemple, rien n\'est enregistré.' }));
-    else if (!canWrite()) b.append(el('p', { class: 'd-banner d-banner--warn' }, 'Votre essai est terminé : l\'espace est en lecture seule. ', el('a', { href: 'mailto:' + (CFG.CONTACT_EMAIL || '') + '?subject=' + encodeURIComponent('Abonnement batiFlow'), text: 'Souscrire une offre' })));
+    else if (S.notice && S.view !== 'account') { b.append(el('p', { class: 'd-banner d-banner--info', role: 'status', text: S.notice })); S.notice = ''; }
+    else if (!canWrite()) b.append(el('p', { class: 'd-banner d-banner--warn' }, 'Votre essai est terminé : l\'espace est en lecture seule. ', el('a', { href: '#', text: 'Choisir une offre', onclick: (e) => { e.preventDefault(); go('account'); } })));
   }
   function render() {
     banner();
     $('view').replaceChildren(VIEWS[S.view]());
     document.querySelectorAll('#sideNav button').forEach((b) => b.classList.toggle('is-active', b.dataset.view === S.view));
-    const p = S.profile, left = S.demo || p.plan !== 'trial' ? null : trialLeft();
-    $('trial').textContent = S.demo ? 'Démonstration' : p.plan === 'essentiel' ? 'Offre Essentiel' : p.plan === 'pro' ? 'Offre Pro' : p.plan === 'annule' ? 'Abonnement résilié' : left > 0 ? 'Essai gratuit : ' + left + ' jour' + (left > 1 ? 's' : '') + ' restant' + (left > 1 ? 's' : '') : 'Essai terminé';
+    const w = S.wp, left = S.demo || w.plan !== 'trial' ? null : trialLeft();
+    $('trial').textContent = S.demo ? 'Démonstration' : w.plan === 'essentiel' ? 'Offre Essentiel' : w.plan === 'pro' ? 'Offre Pro' : w.plan === 'annule' ? 'Abonnement résilié' : left > 0 ? 'Essai gratuit : ' + left + ' jour' + (left > 1 ? 's' : '') + ' restant' + (left > 1 ? 's' : '') : 'Essai terminé';
     $('trial').classList.toggle('is-over', !S.demo && !canWrite());
   }
 
+  // ---------- Équipe : chargement ----------
+  async function loadTeam() {
+    if (!client) return;
+    const me = S.user.id;
+    const [m, i] = await Promise.all([client.from('team_members').select('*'), client.from('team_invites').select('*').is('accepted_at', null)]);
+    S.members = (m.data || []).filter((x) => x.owner_id === S.ws);
+    S.invites = (i.data || []).filter((x) => x.owner_id === S.ws);
+    const ids = [...new Set([S.ws, me, ...S.members.map((x) => x.member_id)])];
+    const { data: prof } = await client.from('profiles').select('id,full_name,email').in('id', ids);
+    S.people = ids.map((id) => (prof || []).find((p) => p.id === id) || { id, full_name: id === me ? S.profile.full_name : '', email: id === me ? S.user.email : '' });
+  }
+
   async function start() {
-    let user = { email: 'demo@batiflow.test' }, profile = { full_name: 'Thomas Lefèvre', company: 'Artisan Rénovation', trade: 'Peintre', plan: 'trial', trial_ends_at: new Date(Date.now() + 7 * DAY).toISOString(), is_admin: false };
+    let user = { id: 'demo', email: 'demo@batiflow.test' }, profile = { id: 'demo', full_name: 'Thomas Lefèvre', company: 'Artisan Rénovation', trade: 'Peintre', plan: 'trial', trial_ends_at: new Date(Date.now() + 7 * DAY).toISOString(), is_admin: false };
     if (client) {
       const { data } = await client.auth.getSession();
       if (!data.session) { location.replace('login.html'); return; }
       user = data.session.user;
       const { data: prof } = await client.from('profiles').select('*').eq('id', user.id).maybeSingle();
-      profile = prof || { full_name: (user.user_metadata || {}).full_name, plan: 'trial', trial_ends_at: new Date(Date.now() + 7 * DAY).toISOString(), is_admin: false };
+      profile = prof || { id: user.id, full_name: (user.user_metadata || {}).full_name, plan: 'trial', trial_ends_at: new Date(Date.now() + 7 * DAY).toISOString(), is_admin: false };
+      try { await client.rpc('accept_team_invites'); } catch { /* sans invitation */ }
     }
-    S.user = user; S.profile = profile;
+    S.user = user; S.profile = profile; S.ws = user.id; S.wp = profile; S.role = 'owner';
+    if (client) {
+      // Membre d'une équipe Pro : on travaille dans l'espace du responsable.
+      const { data: mem } = await client.from('team_members').select('owner_id').eq('member_id', user.id).maybeSingle();
+      if (mem) {
+        const { data: ownerProf } = await client.from('profiles').select('*').eq('id', mem.owner_id).maybeSingle();
+        if (ownerProf && ownerProf.plan === 'pro') { S.ws = mem.owner_id; S.wp = ownerProf; S.role = 'member'; }
+        else S.notice = 'L\'équipe de ' + ((ownerProf && ownerProf.full_name) || 'votre responsable') + ' n\'a plus l\'offre Pro : vous retrouvez votre espace personnel.';
+      }
+    } else {
+      S.people = [{ id: 'demo', full_name: 'Thomas Lefèvre', email: 'demo@batiflow.test' }, { id: 'demo2', full_name: 'Sophie Bernard', email: 'sophie@example.com' }];
+      S.members = [{ owner_id: 'demo', member_id: 'demo2' }];
+    }
     $('uname').textContent = profile.full_name || 'Votre compte';
-    $('ucompany').textContent = profile.company || profile.trade || '';
+    $('ucompany').textContent = S.role === 'member' ? 'Équipe de ' + (S.wp.full_name || '') : profile.company || profile.trade || '';
     $('avatar').textContent = ((profile.full_name || user.email || '?').trim()[0] || '?').toUpperCase();
-    $('adminLink').hidden = !profile.is_admin;
+    // Lien d'administration : créé uniquement pour un administrateur, absent du HTML des clients.
+    if (profile.is_admin) $('sideNav').append(el('a', { href: 'admin.html', text: 'Administration' }));
     if (CFG.CONTACT_EMAIL) $('helpLink').href = 'mailto:' + CFG.CONTACT_EMAIL;
-    try { await load(); } catch (e) { $('view').replaceChildren(el('p', { class: 'd-banner d-banner--warn', text: 'Chargement impossible : ' + e.message })); document.body.hidden = false; return; }
+    try { await load(); await loadTeam(); } catch (e) { $('view').replaceChildren(el('p', { class: 'd-banner d-banner--warn', text: 'Chargement impossible : ' + e.message })); document.body.hidden = false; return; }
+    const q = new URLSearchParams(location.search).get('paiement');
+    if (q) {
+      history.replaceState(null, '', location.pathname);
+      if (q === 'ok') { S.view = 'account'; S.notice = 'Paiement reçu, merci ! Votre offre est en cours d\'activation…'; document.body.hidden = false; render(); await refreshProfile((d) => d.plan === 'essentiel' || d.plan === 'pro'); S.notice = (S.wp.plan === 'pro' || S.wp.plan === 'essentiel') ? 'Votre abonnement est actif. Merci !' : 'Activation en cours : actualisez la page dans un instant.'; render(); return; }
+      if (q === 'annule') { S.view = 'account'; S.notice = 'Paiement annulé : aucun montant n\'a été débité.'; }
+    }
     document.body.hidden = false;
     render();
   }

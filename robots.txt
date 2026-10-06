@@ -1,6 +1,2 @@
 User-agent: *
 Allow: /
-Disallow: /app.html
-Disallow: /admin.html
-Disallow: /login.html
-Disallow: /merci.html
