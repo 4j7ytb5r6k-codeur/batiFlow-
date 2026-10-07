@@ -63,11 +63,13 @@ Deno.serve(async (req) => {
       if (profile.stripe_subscription_id) return json({ error: "Un abonnement existe déjà : utilisez le changement d'offre." }, 409, origin);
       const product = await ensureProduct(secret, plan as Plan);
       const sub: Record<string, unknown> = { metadata: { user_id: user.id, plan, billing } };
-      // Essai en cours : premier paiement à la fin de l'essai (Stripe exige au moins 48 h)
-      const trialEnd = profile.plan === "trial" ? Math.floor(new Date(profile.trial_ends_at).getTime() / 1000) : 0;
-      if (trialEnd - Math.floor(Date.now() / 1000) > 49 * 3600) sub.trial_end = trialEnd;
+      // Premier abonnement : 7 jours d'essai gratuit, carte obligatoire dès le départ, premier débit à la fin de l'essai.
+      // Pas de nouvel essai pour un compte qui a déjà eu un abonnement (offre résiliée).
+      const firstTime = profile.plan === "trial" && !profile.stripe_subscription_id;
+      if (firstTime) { sub.trial_period_days = 7; sub.trial_settings = { end_behavior: { missing_payment_method: "cancel" } }; }
       const s = await stripeCall(secret, "/checkout/sessions", "POST", {
         mode: "subscription", customer: await customerId(), client_reference_id: user.id, locale: "fr", allow_promotion_codes: true,
+        payment_method_collection: "always",
         line_items: [{ quantity: 1, price_data: priceData(product, plan as Plan, billing as Billing) }],
         subscription_data: sub, success_url: `${base}?paiement=ok`, cancel_url: `${base}?paiement=annule`,
       });

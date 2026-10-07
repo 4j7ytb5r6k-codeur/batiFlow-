@@ -83,20 +83,15 @@
 
   // ---------- Droits d'écriture et offre Pro (d'après l'espace de travail : le vôtre, ou celui de votre équipe) ----------
   const trialLeft = (p = S.wp) => Math.ceil((new Date(p.trial_ends_at) - Date.now()) / DAY);
-  function canWrite() {
-    const p = S.wp;
-    if (S.demo || S.profile.is_admin || p.is_admin) return true;
-    if (p.plan === 'essentiel' || p.plan === 'pro') return true;
-    return p.plan === 'trial' && trialLeft() > 0;
-  }
-  // Le Pro est inclus pendant l'essai pour pouvoir le tester.
-  function hasPro() {
-    const p = S.wp;
-    return S.demo || S.profile.is_admin || p.is_admin || p.plan === 'pro' || (p.plan === 'trial' && trialLeft() > 0);
-  }
+  const hasOffer = (p = S.wp) => p.plan === 'essentiel' || p.plan === 'pro'; // l'essai gratuit est une offre avec moyen de paiement enregistré
+  const isTrialing = (p = S.wp) => hasOffer(p) && p.subscription_status === 'trialing';
+  function canWrite() { return S.demo || S.profile.is_admin || S.wp.is_admin || hasOffer(); }
+  function hasPro() { return S.demo || S.profile.is_admin || S.wp.is_admin || S.wp.plan === 'pro'; }
+  const needsOffer = () => !S.demo && !S.profile.is_admin && S.role === 'owner' && !hasOffer();
   function guardWrite() {
     if (canWrite()) return true;
-    alert("Votre essai est terminé : l'espace est en lecture seule. Choisissez une offre dans « Mon compte ».");
+    alert("Pour continuer, choisissez une offre dans « Mon compte » : l'essai gratuit de 7 jours démarre à ce moment-là.");
+    if (S.view !== 'account') go('account');
     return false;
   }
   const personName = (id) => { const p = S.people.find((x) => x.id === id); return p ? (p.full_name || p.email || 'Collègue') : ''; };
@@ -661,12 +656,12 @@
   }
   function viewAccount() {
     const p = S.profile, w = S.wp, own = S.role === 'owner';
-    const planName = { trial: 'Essai gratuit', essentiel: 'Essentiel', pro: 'Pro', annule: 'Résilié' }[w.plan] || w.plan;
+    const planName = hasOffer(w) ? (w.plan === 'pro' ? 'Pro' : 'Essentiel') + (isTrialing(w) ? ' (essai gratuit)' : '') : w.plan === 'annule' ? 'Résilié' : 'Aucune offre';
     const row = (l, v) => el('li', null, el('span', { class: 'd-muted', text: l }), el('strong', { text: v || '—' }));
     const per = S.billingPeriod;
     const offer = (key) => {
       const o = PLANS[key], cur = w.plan === key && (w.billing || 'month') === per, same = w.plan === key;
-      const label = cur ? 'Offre actuelle' : same ? 'Passer en ' + (per === 'year' ? 'annuel' : 'mensuel') : (w.plan === 'essentiel' || w.plan === 'pro') ? (key === 'pro' ? 'Passer au Pro' : 'Passer à l\'Essentiel') : 'Choisir ' + o.name;
+      const label = cur ? 'Offre actuelle' : same ? 'Passer en ' + (per === 'year' ? 'annuel' : 'mensuel') : hasOffer(w) ? (key === 'pro' ? 'Passer au Pro' : 'Passer à l\'Essentiel') : w.plan === 'trial' ? 'Démarrer l\'essai gratuit ' + o.name : 'Choisir ' + o.name;
       const price = per === 'year' ? o.year : o.month;
       return el('article', { class: 'd-card d-offer' + (cur ? ' is-current' : '') }, el('h3', { text: o.name }),
         el('p', { class: 'd-price' }, el('b', { text: money(price) }), ' TTC / ' + (per === 'year' ? 'an' : 'mois')),
@@ -679,7 +674,7 @@
       S.notice ? el('p', { class: 'd-banner d-banner--info', role: 'status', text: S.notice }) : null,
       el('div', { class: 'd-card' }, el('h2', { text: 'Informations' }), el('ul', { class: 'd-kv' },
         row('Nom', p.full_name), row('Entreprise', p.company), row('Métier', p.trade), row('Email', S.user.email), row('Téléphone', p.phone), row('Adresse', p.company_address), row('SIRET', p.siret), row('Mention TVA', p.tva_mention), row('Offre', planName + (own ? '' : ' (équipe)')),
-        w.plan === 'trial' ? row('Fin de l\'essai', fdate(w.trial_ends_at)) : null,
+        isTrialing(w) ? row('Essai gratuit jusqu\'au', fdate(w.trial_ends_at) + ' (premier débit à cette date)') : null,
         sub && p.current_period_end ? row(p.cancel_at_period_end ? 'Se termine le' : 'Prochain renouvellement', fdate(p.current_period_end)) : null),
         el('p', { class: 'd-muted', text: 'Votre adresse, votre SIRET et votre mention de TVA apparaissent sur vos devis PDF.' }),
         el('div', { class: 'd-actions d-actions--inline' }, el('button', { type: 'button', class: 'btn btn--ghost', text: 'Modifier mes informations', onclick: editCompany }))),
@@ -687,10 +682,10 @@
         el('div', { class: 'billing', role: 'group', 'aria-label': 'Période de facturation' }, ['month', 'year'].map((k) => el('button', { type: 'button', class: 'billing__btn' + (per === k ? ' is-active' : ''), 'aria-pressed': String(per === k), text: k === 'month' ? 'Mensuel' : 'Annuel',
           onclick: () => { S.billingPeriod = k; render(); } }))),
         el('div', { class: 'd-offers' }, offer('essentiel'), offer('pro')),
-        el('p', { class: 'd-muted', text: 'Paiement sécurisé. Vous pouvez changer d\'offre ou résilier à tout moment, sans nous contacter.' + (w.plan === 'trial' ? ' Si votre essai est en cours, le premier paiement a lieu à sa fin.' : '') }),
+        el('p', { class: 'd-muted', text: w.plan === 'trial' ? 'Essai gratuit de 7 jours : votre moyen de paiement est demandé maintenant, mais vous n\'êtes débité qu\'à la fin de l\'essai. Résiliez avant et vous ne payez rien. Paiement sécurisé par Stripe.' : 'Paiement sécurisé. Vous pouvez changer d\'offre ou résilier à tout moment, sans nous contacter.' }),
         sub ? el('div', { class: 'd-actions d-actions--inline' }, el('button', { type: 'button', class: 'btn btn--ghost', text: 'Moyen de paiement et factures', onclick: () => pay('portal') }),
           p.cancel_at_period_end ? el('button', { type: 'button', class: 'btn btn--primary', text: 'Reprendre mon abonnement', onclick: () => pay('resume') })
-            : el('button', { type: 'button', class: 'btn btn--ghost', text: 'Résilier à la fin de la période', onclick: () => { if (confirm('Résilier votre abonnement ? Il reste actif jusqu\'à la fin de la période déjà payée.')) pay('cancel'); } })) : null)
+            : el('button', { type: 'button', class: 'btn btn--ghost', text: isTrialing(w) ? 'Annuler avant le premier débit' : 'Résilier à la fin de la période', onclick: () => { if (confirm(isTrialing(w) ? 'Annuler votre abonnement ? Vous ne serez pas débité et gardez l\'accès jusqu\'à la fin de l\'essai.' : 'Résilier votre abonnement ? Il reste actif jusqu\'à la fin de la période déjà payée.')) pay('cancel'); } })) : null)
         : el('div', { class: 'd-card' }, el('h2', { text: 'Abonnement' }), el('p', { class: 'd-muted', text: 'L\'abonnement est géré par le responsable de l\'équipe.' })),
       hasPro() ? el('div', { class: 'd-card' }, el('h2', { text: 'Support prioritaire' }), el('p', { class: 'd-muted', text: 'Votre message est traité en priorité par notre équipe.' }),
         el('div', { class: 'd-actions d-actions--inline' }, el('button', { type: 'button', class: 'btn btn--ghost', text: 'Écrire au support', onclick: supportForm }))) : null,
@@ -710,14 +705,16 @@
     const b = $('banner'); b.replaceChildren();
     if (S.demo) b.append(el('p', { class: 'd-banner d-banner--info', text: 'Mode démonstration : données d\'exemple, rien n\'est enregistré.' }));
     else if (S.notice && S.view !== 'account') { b.append(el('p', { class: 'd-banner d-banner--info', role: 'status', text: S.notice })); S.notice = ''; }
-    else if (!canWrite()) b.append(el('p', { class: 'd-banner d-banner--warn' }, 'Votre essai est terminé : l\'espace est en lecture seule. ', el('a', { href: '#', text: 'Choisir une offre', onclick: (e) => { e.preventDefault(); go('account'); } })));
+    else if (needsOffer() && S.wp.plan === 'annule') b.append(el('p', { class: 'd-banner d-banner--warn' }, 'Votre abonnement est résilié : l\'espace est en lecture seule. ', el('a', { href: '#', text: 'Choisir une offre', onclick: (e) => { e.preventDefault(); go('account'); } })));
+    else if (needsOffer()) b.append(el('p', { class: 'd-banner d-banner--info' }, 'Bienvenue ! Choisissez votre offre pour démarrer votre essai gratuit de 7 jours. Un moyen de paiement est demandé, mais aucun débit n\'a lieu avant la fin de l\'essai. ', el('a', { href: '#', text: 'Choisir mon offre', onclick: (e) => { e.preventDefault(); go('account'); } })));
+    else if (!canWrite()) b.append(el('p', { class: 'd-banner d-banner--warn', text: 'L\'offre de votre équipe est inactive : l\'espace est en lecture seule.' }));
   }
   function render() {
     banner();
     $('view').replaceChildren(VIEWS[S.view]());
     document.querySelectorAll('#sideNav button').forEach((b) => b.classList.toggle('is-active', b.dataset.view === (S.view === 'photos' ? 'chantiers' : S.view)));
-    const w = S.wp, left = S.demo || w.plan !== 'trial' ? null : trialLeft();
-    $('trial').textContent = S.demo ? 'Démonstration' : w.plan === 'essentiel' ? 'Offre Essentiel' : w.plan === 'pro' ? 'Offre Pro' : w.plan === 'annule' ? 'Abonnement résilié' : left > 0 ? 'Essai gratuit : ' + left + ' jour' + (left > 1 ? 's' : '') + ' restant' + (left > 1 ? 's' : '') : 'Essai terminé';
+    const w = S.wp, nm = w.plan === 'pro' ? 'Pro' : 'Essentiel', left = isTrialing(w) ? Math.max(0, trialLeft(w)) : 0;
+    $('trial').textContent = S.demo ? 'Démonstration' : isTrialing(w) ? 'Essai gratuit : ' + left + ' jour' + (left > 1 ? 's' : '') + ' restant' + (left > 1 ? 's' : '') + ' · ' + nm : hasOffer(w) ? 'Offre ' + nm : w.plan === 'annule' ? 'Abonnement résilié' : 'Aucune offre';
     $('trial').classList.toggle('is-over', !S.demo && !canWrite());
   }
 
@@ -766,10 +763,11 @@
     const q = new URLSearchParams(location.search).get('paiement');
     if (q) {
       history.replaceState(null, '', location.pathname);
-      if (q === 'ok') { S.view = 'account'; S.notice = 'Paiement reçu, merci ! Votre offre est en cours d\'activation…'; document.body.hidden = false; render(); await refreshProfile((d) => d.plan === 'essentiel' || d.plan === 'pro'); S.notice = (S.wp.plan === 'pro' || S.wp.plan === 'essentiel') ? 'Votre abonnement est actif. Merci !' : 'Activation en cours : actualisez la page dans un instant.'; render(); return; }
+      if (q === 'ok') { S.view = 'account'; S.notice = 'Moyen de paiement enregistré, merci ! Votre offre est en cours d\'activation…'; document.body.hidden = false; render(); await refreshProfile((d) => d.plan === 'essentiel' || d.plan === 'pro'); S.notice = isTrialing() ? 'Votre essai gratuit de 7 jours est démarré. Aucun débit avant le ' + fdate(S.wp.trial_ends_at) + '.' : hasOffer() ? 'Votre abonnement est actif. Merci !' : 'Activation en cours : actualisez la page dans un instant.'; S.view = 'dashboard'; render(); return; }
       if (q === 'annule') { S.view = 'account'; S.notice = 'Paiement annulé : aucun montant n\'a été débité.'; }
     }
     try { await loadTeam(); } catch { /* l'équipe est facultative */ }
+    if (needsOffer() && S.view === 'dashboard') S.view = 'account'; // un nouveau client choisit d'abord son offre
     document.body.hidden = false;
     render();
   }

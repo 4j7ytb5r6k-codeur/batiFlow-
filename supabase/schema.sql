@@ -14,7 +14,7 @@ create table if not exists public.profiles (
   trial_ends_at timestamptz not null default (now() + interval '7 days'),
   is_admin      boolean not null default false,
   company_address text, siret text, tva_mention text,
-  stripe_customer_id text, stripe_subscription_id text,
+  stripe_customer_id text, stripe_subscription_id text, subscription_status text,
   cancel_at_period_end boolean not null default false, current_period_end timestamptz,
   created_at    timestamptz not null default now()
 );
@@ -263,3 +263,27 @@ values ('chantier-photos', 'chantier-photos', false, 5242880, array['image/jpeg'
 create policy "chantier_photos_workspace" on storage.objects for all to authenticated
   using (bucket_id = 'chantier-photos' and case when (storage.foldername(name))[1] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then public.can_access(((storage.foldername(name))[1])::uuid) else false end)
   with check (bucket_id = 'chantier-photos' and case when (storage.foldername(name))[1] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then public.can_access(((storage.foldername(name))[1])::uuid) else false end);
+
+-- ============ Essai gratuit avec moyen de paiement obligatoire ============
+-- Un nouveau compte a plan = 'trial' : "inscrit, sans offre". Il choisit une offre ; Stripe démarre alors l'essai de 7 jours
+-- (carte enregistrée, premier débit à la fin) et le webhook passe le profil en 'essentiel' ou 'pro' (subscription_status = 'trialing').
+-- Sans offre active ('trial' ou 'annule'), toute création ou modification de données est refusée côté serveur (la suppression reste possible).
+create or replace function public.workspace_writable(ws uuid) returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce((select p.plan in ('essentiel','pro') or p.is_admin from public.profiles p where p.id = ws), false) $$;
+revoke execute on function public.workspace_writable(uuid) from public, anon;
+grant execute on function public.workspace_writable(uuid) to authenticated;
+create or replace function public.require_writable() returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is not null and not public.workspace_writable(new.owner_id) then
+    raise exception 'Offre requise : choisissez une offre pour continuer';
+  end if;
+  return new;
+end; $$;
+revoke execute on function public.require_writable() from public, anon, authenticated;
+create trigger clients_writable before insert or update on public.clients for each row execute function public.require_writable();
+create trigger chantiers_writable before insert or update on public.chantiers for each row execute function public.require_writable();
+create trigger devis_writable before insert or update on public.devis for each row execute function public.require_writable();
+create trigger comptes_rendus_writable before insert or update on public.comptes_rendus for each row execute function public.require_writable();
+create trigger photos_writable before insert or update on public.photos for each row execute function public.require_writable();
+create policy "chantier_photos_need_offer" on storage.objects as restrictive for insert to authenticated
+  with check (bucket_id <> 'chantier-photos' or case when (storage.foldername(name))[1] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then public.workspace_writable(((storage.foldername(name))[1])::uuid) else false end);

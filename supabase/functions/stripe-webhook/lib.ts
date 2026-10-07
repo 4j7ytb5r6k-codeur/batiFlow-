@@ -94,15 +94,18 @@ export function profileUpdateFromSubscription(sub: any): Record<string, unknown>
   const status = String(sub?.status ?? "");
   const customer = typeof sub?.customer === "string" ? sub.customer : sub?.customer?.id;
   if (["canceled", "unpaid", "incomplete_expired"].includes(status)) {
-    return { plan: "annule", stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, stripe_customer_id: customer ?? null };
+    return { plan: "annule", subscription_status: status, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, stripe_customer_id: customer ?? null };
   }
   if (!["active", "trialing", "past_due"].includes(status)) return null; // incomplete : en attente du paiement
   const plan = sub?.metadata?.plan, billing = sub?.metadata?.billing;
   if (!isPlan(plan) || !isBilling(billing)) return null;
   const end = sub?.current_period_end ?? sub?.items?.data?.[0]?.current_period_end;
-  return {
-    plan, billing, stripe_customer_id: customer ?? null, stripe_subscription_id: sub.id,
+  const patch: Record<string, unknown> = {
+    plan, billing, subscription_status: status, stripe_customer_id: customer ?? null, stripe_subscription_id: sub.id,
     cancel_at_period_end: !!sub.cancel_at_period_end,
     current_period_end: end ? new Date(end * 1000).toISOString() : null,
   };
+  // Essai gratuit en cours : la date de fin d'essai vient de Stripe (carte déjà enregistrée, premier débit à cette date).
+  if (status === "trialing" && sub.trial_end) patch.trial_ends_at = new Date(sub.trial_end * 1000).toISOString();
+  return patch;
 }

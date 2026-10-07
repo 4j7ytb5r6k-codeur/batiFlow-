@@ -21,18 +21,20 @@
 
   function stats() {
     const now = Date.now(), cl = state.profiles.filter((p) => !p.is_admin);
-    const paying = cl.filter((p) => p.plan === 'essentiel' || p.plan === 'pro');
-    const trials = cl.filter((p) => p.plan === 'trial');
+    const has = (p) => p.plan === 'essentiel' || p.plan === 'pro';
+    const trialing = cl.filter((p) => has(p) && p.subscription_status === 'trialing');
+    const paying = cl.filter((p) => has(p) && p.subscription_status !== 'trialing');
+    const noOffer = cl.filter((p) => p.plan === 'trial');
+    const started = cl.length - noOffer.length;
     const mrr = paying.reduce((s, p) => s + PRICE_MONTHLY[p.plan][p.billing === 'year' ? 'year' : 'month'], 0);
     return {
-      total: cl.length,
+      total: cl.length, noOffer: noOffer.length,
       new7: cl.filter((p) => now - new Date(p.created_at) < 7 * DAY).length,
-      trialActive: trials.filter((p) => new Date(p.trial_ends_at) > now).length,
-      trialSoon: trials.filter((p) => { const l = new Date(p.trial_ends_at) - now; return l > 0 && l < 2 * DAY; }).length,
-      trialEnded: trials.filter((p) => new Date(p.trial_ends_at) <= now).length,
-      essentiel: cl.filter((p) => p.plan === 'essentiel').length, pro: cl.filter((p) => p.plan === 'pro').length,
+      trialActive: trialing.length,
+      trialSoon: trialing.filter((p) => { const l = new Date(p.trial_ends_at) - now; return l > 0 && l < 2 * DAY; }).length,
+      essentiel: paying.filter((p) => p.plan === 'essentiel').length, pro: paying.filter((p) => p.plan === 'pro').length,
       cancelled: cl.filter((p) => p.plan === 'annule').length,
-      mrr, arr: mrr * 12, conv: cl.length ? Math.round((paying.length / cl.length) * 100) : 0,
+      mrr, arr: mrr * 12, conv: started ? Math.round((paying.length / started) * 100) : 0,
     };
   }
   const kpi = (v, l, hint) => el('div', { class: 'd-card' }, el('b', { text: v }), el('span', { text: l }), hint ? el('small', { class: 'd-muted', text: hint }) : null);
@@ -68,8 +70,8 @@
     const open = state.messages.filter((m) => !m.handled).length;
     root.replaceChildren(
       el('h1', { text: 'Tableau de bord administrateur' }),
-      el('section', { class: 'd-stats' }, kpi(s.total, 'Clients inscrits', s.new7 + ' cette semaine'), kpi(s.trialActive, 'Essais en cours', s.trialSoon + ' se terminent sous 48 h'),
-        kpi(s.essentiel + s.pro, 'Abonnés', s.essentiel + ' Essentiel · ' + s.pro + ' Pro'), kpi(s.conv + ' %', 'Conversion essai → payant', s.trialEnded + ' essais terminés sans offre')),
+      el('section', { class: 'd-stats' }, kpi(s.total, 'Clients inscrits', s.new7 + ' cette semaine · ' + s.noOffer + ' sans offre'), kpi(s.trialActive, 'Essais en cours (carte enregistrée)', s.trialSoon + ' se terminent sous 48 h'),
+        kpi(s.essentiel + s.pro, 'Abonnés', s.essentiel + ' Essentiel · ' + s.pro + ' Pro'), kpi(s.conv + ' %', 'Conversion essai → payant', 'parmi ceux qui ont démarré un essai')),
       el('section', { class: 'd-stats d-stats--3' }, kpi(eur.format(s.mrr), 'CA mensuel estimé (TTC)', 'Calculé d\'après les offres attribuées'), kpi(eur.format(s.arr), 'CA annuel estimé (TTC)', 'MRR × 12'), kpi(s.cancelled, 'Abonnements résiliés')),
       el('p', { class: 'd-note', text: 'Le chiffre d\'affaires est une estimation basée sur l\'offre et la facturation que vous attribuez à chaque client. Il ne reflète pas des encaissements réels tant qu\'aucun système de paiement n\'est branché.' }),
       el('div', { class: 'd-card' }, el('h2', { text: 'Inscriptions des 14 derniers jours' }), chart()),
@@ -81,10 +83,9 @@
             el('td', null, el('strong', { text: p.full_name || '—' }), el('small', { text: [p.company, p.trade].filter(Boolean).join(' · ') }), p.is_admin ? el('em', { class: 'tag tag--blue', text: 'admin' }) : null, p.stripe_subscription_id ? el('em', { class: 'tag tag--green', text: p.cancel_at_period_end ? 'Stripe · résilie' : 'Stripe' }) : null),
             el('td', null, el('a', { href: 'mailto:' + (p.email || ''), text: p.email || '—' }), el('small', { text: p.phone || '' })),
             el('td', { text: fdate(p.created_at) }),
-            el('td', null, sel([['trial', 'Essai'], ['essentiel', 'Essentiel'], ['pro', 'Pro'], ['annule', 'Résilié']], p.plan, (v) => updateProfile(p.id, { plan: v }), 'Offre de ' + (p.full_name || p.email))),
+            el('td', null, sel([['trial', 'Sans offre'], ['essentiel', 'Essentiel'], ['pro', 'Pro'], ['annule', 'Résilié']], p.plan, (v) => updateProfile(p.id, { plan: v }), 'Offre de ' + (p.full_name || p.email))),
             el('td', null, sel([['month', 'Mensuel'], ['year', 'Annuel']], p.billing || 'month', (v) => updateProfile(p.id, { billing: v }), 'Facturation de ' + (p.full_name || p.email))),
-            el('td', null, el('span', { text: fdate(p.trial_ends_at) + ' ' }), el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: '+7 j', title: 'Prolonger l\'essai de 7 jours',
-              onclick: () => updateProfile(p.id, { trial_ends_at: new Date(Math.max(Date.now(), new Date(p.trial_ends_at).getTime()) + 7 * DAY).toISOString() }) }))))))),
+            el('td', { text: p.subscription_status === 'trialing' ? fdate(p.trial_ends_at) : '—' })))))),
         list.length ? null : el('p', { class: 'd-muted', text: 'Aucun client ne correspond.' })),
       el('div', { class: 'd-card' }, el('h2', { text: 'Messages reçus (' + open + ' à traiter)' }),
         inbox.length ? el('ul', { class: 'd-rows d-rows--wide' }, inbox.map((m) => el('li', { class: 'd-cr' + (m.handled ? ' is-done' : '') },

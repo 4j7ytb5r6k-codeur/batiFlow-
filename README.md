@@ -34,7 +34,8 @@ Pages : `login.html` (connexion), `app.html` (espace client : clients, chantiers
 
 ## Offre Pro et abonnements (Stripe)
 
-- **Offre Pro** (déjà en place) : équipe jusqu'à 5 utilisateurs (Équipe), planning partagé avec chantiers assignés (Planning), statistiques détaillées (Statistiques), support prioritaire (messages marqués « Pro » dans l'administration). Pendant l'essai de 7 jours, le Pro est inclus pour pouvoir le tester.
+- **Essai gratuit avec carte obligatoire** : après l'inscription, le client choisit une offre ; Stripe Checkout enregistre sa carte et démarre un essai de 7 jours (aucun débit avant la fin). Le premier débit a lieu à la fin de l'essai, sauf annulation avant. Sans offre active, l'espace est en lecture seule, y compris côté base de données (déclencheurs `require_writable`). Un seul essai par compte.
+- **Offre Pro** (déjà en place) : équipe jusqu'à 5 utilisateurs (Équipe), planning partagé avec chantiers assignés (Planning), statistiques détaillées (Statistiques), support prioritaire (messages marqués « Pro » dans l'administration). Les fonctions Pro sont réservées à l'offre Pro (y compris pendant son essai gratuit).
 - **Changement d'offre sans contact** : depuis « Mon compte », le client souscrit, change d'offre (prorata automatique), résilie ou reprend son abonnement, et accède à ses factures. Cela passe par les fonctions Supabase `billing` et `stripe-webhook` (dossier `supabase/functions/`, déjà déployées).
 - **Tant que Stripe n'est pas configuré**, ces boutons affichent « Le paiement en ligne n'est pas encore activé ». Activation :
   1. Créez un compte sur https://stripe.com et activez le mode test (puis le mode production quand tout est validé).
