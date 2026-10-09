@@ -2,7 +2,7 @@
 
 Dans le bâtiment, on passe plus de temps sur la paperasse que sur les chantiers. On a voulu changer ça.
 
-BatiFlow BTP, c'est l'outil d'automatisation par IA conçu pour les professionnels du bâtiment :
+BatiFlow BTP, c'est l'outil conçu pour simplifier le quotidien des professionnels du bâtiment :
 
 📝 Comptes rendus de chantier générés en quelques minutes
 💶 Devis rapides et professionnels
@@ -13,4 +13,4 @@ Moins d'administratif, plus de temps pour ce que vous faites de mieux : construi
 
 Artisans, entreprises du BTP, conducteurs de travaux : vous voulez être parmi les premiers à tester ? Suivez la page et écrivez-nous en message privé 👇
 
-#BTP #Bâtiment #IA #Artisans #Devis #Chantier #Automatisation #BatiFlow
+#BTP #Bâtiment #Artisans #Devis #Chantier #BatiFlow
