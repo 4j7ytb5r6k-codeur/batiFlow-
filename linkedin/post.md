@@ -1,16 +1,18 @@
-🚧 Le lancement approche… BatiFlow BTP arrive bientôt !
+🚧 Moins de paperasse, plus de chantier. BatiFlow BTP arrive bientôt.
 
-Dans le bâtiment, on passe plus de temps sur la paperasse que sur les chantiers. On a voulu changer ça.
+Dans le bâtiment, on passe souvent plus de temps à rédiger qu'à construire : comptes rendus, devis, relances, suivi des chantiers…
 
-BatiFlow BTP, c'est l'outil conçu pour simplifier le quotidien des professionnels du bâtiment :
+C'est pour ça qu'on a créé BatiFlow BTP, un outil pensé pour les pros du bâtiment :
 
-📝 Comptes rendus de chantier générés en quelques minutes
-💶 Devis rapides et professionnels
-🏗️ Suivi de vos chantiers en cours et terminés
-🔔 Relances de devis automatiques, pour ne plus laisser filer un client
+📝 Vos comptes rendus de chantier, rédigés en quelques minutes
+💶 Des devis clairs et professionnels, vite faits
+🏗️ Le suivi de vos chantiers en cours et terminés, au même endroit
+🔔 Des relances de devis automatiques, pour ne plus laisser filer un client
 
-Moins d'administratif, plus de temps pour ce que vous faites de mieux : construire.
+Le but : vous faire gagner du temps pour vous concentrer sur ce que vous faites de mieux.
 
-Artisans, entreprises du BTP, conducteurs de travaux : vous voulez être parmi les premiers à tester ? Suivez la page et écrivez-nous en message privé 👇
+Le lancement approche. Artisan, chef d'entreprise ou conducteur de travaux, vous voulez faire partie des premiers à l'essayer ?
+
+👉 Suivez la page et écrivez-nous en message privé.
 
 #BTP #Bâtiment #Artisans #Devis #Chantier #BatiFlow
