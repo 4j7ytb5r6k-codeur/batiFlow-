@@ -14,11 +14,7 @@ menu.addEventListener('click', (e) => {
 
 document.getElementById('year').textContent = new Date().getFullYear();
 
-// Formulaire d'essai gratuit.
-// Pour le brancher sur un vrai service (Formspree, Netlify Forms, votre API…),
-// renseignez son URL ici. Tant que c'est vide, l'inscription est simulée.
-const FORM_ENDPOINT = '';
-
+// Formulaire d'essai gratuit : crée le compte dans Supabase (aucune autre copie des données n'est envoyée ailleurs).
 const form = document.getElementById('trialForm');
 const msg = document.getElementById('formMsg');
 const field = (n) => form.elements.namedItem(n);
@@ -42,15 +38,17 @@ form.addEventListener('submit', async (e) => {
   const nameOk = (data.name || '').trim().length > 1;
   const tradeOk = !!data.trade;
   const passOk = !window.bfClient || password.length >= 8;
+  const acceptOk = form.elements.namedItem('accept').checked;
 
   setError(field('name'), !nameOk);
   setError(field('email'), !emailOk);
   setError(field('trade'), !tradeOk);
   setError(field('password'), !passOk);
+  setError(field('accept'), !acceptOk);
 
   msg.className = 'form__msg';
-  if (!(nameOk && emailOk && tradeOk && passOk)) {
-    msg.textContent = passOk ? 'Merci de compléter les champs en rouge.' : 'Le mot de passe doit contenir au moins 8 caractères.';
+  if (!(nameOk && emailOk && tradeOk && passOk && acceptOk)) {
+    msg.textContent = !passOk ? 'Le mot de passe doit contenir au moins 8 caractères.' : !acceptOk ? 'Cochez la case pour accepter les conditions.' : 'Merci de compléter les champs en rouge.';
     msg.classList.add('is-error');
     return;
   }
@@ -62,7 +60,7 @@ form.addEventListener('submit', async (e) => {
         email: data.email,
         password,
         options: {
-          data: { full_name: data.name.trim(), company: data.company || '', trade: data.trade, phone: data.phone || '' },
+          data: { full_name: data.name.trim(), company: data.company || '', trade: data.trade, phone: data.phone || '', cgv_accepted_at: new Date().toISOString() },
           emailRedirectTo: new URL('app.html', location.href).href,
         },
       });
@@ -73,38 +71,8 @@ form.addEventListener('submit', async (e) => {
       msg.classList.add('is-ok');
       return;
     }
-    if (FORM_ENDPOINT) {
-      const res = await fetch(FORM_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error('Erreur serveur');
-    } else {
-      // Netlify Forms : fonctionne sans configuration une fois le site déployé sur Netlify.
-      let sent = false;
-      if (/^https?:$/.test(location.protocol) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
-        try {
-          const body = new FormData(form);
-          body.delete('password');
-          const res = await fetch('/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams(body).toString(),
-          });
-          sent = res.ok;
-        } catch { sent = false; }
-      }
-      if (!sent) {
-        // Mode démo (aperçu local ou hébergeur sans Netlify Forms) : enregistrement dans le navigateur
-        const list = JSON.parse(localStorage.getItem('batiflow_trials') || '[]');
-        list.push({ ...data, date: new Date().toISOString() });
-        localStorage.setItem('batiflow_trials', JSON.stringify(list));
-      }
-    }
-    form.reset();
-    msg.textContent = 'Merci ! Votre essai gratuit de 7 jours est enregistré. Nous vous contactons très vite.';
-    msg.classList.add('is-ok');
+    // Sans service de comptes, on ne collecte ni ne conserve rien (aucune donnée gardée dans le navigateur).
+    throw new Error('Service indisponible');
   } catch (err) {
     const already = err && /already registered|already been registered/i.test(err.message || '');
     msg.textContent = already

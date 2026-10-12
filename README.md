@@ -49,7 +49,7 @@ Pages : `login.html` (connexion), `app.html` (espace client : clients, chantiers
 
 À faire côté Supabase (Authentication > URL Configuration) : renseigner l'adresse du site dans « Site URL » et « Redirect URLs ». Pour la production, configurer un SMTP (Authentication > SMTP Settings).
 
-À compléter dans le site avant de vendre : `mentions-legales.html`, `cgv.html`, `confidentialite.html` (passages surlignés `[À COMPLÉTER]`), puis faire relire par un juriste.
+Pages légales : `mentions-legales.html`, `cgv.html`, `cgu.html`, `remboursement.html`, `confidentialite.html`, `cookies.html`. À compléter avant de vendre : les passages surlignés `[ENTRE CROCHETS]` (identité de l'éditeur, prestataire de paiement, durées, choix de remboursement), puis faire relire par un juriste.
 
 ## Mise en ligne
 

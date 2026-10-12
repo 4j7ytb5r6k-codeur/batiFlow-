@@ -1,2 +1,6 @@
+# Le site vitrine est ouvert à tous les robots, y compris les agents IA (GPTBot, ClaudeBot, PerplexityBot…).
 User-agent: *
 Allow: /
+Disallow: /app.html
+Disallow: /admin.html
+Disallow: /login.html

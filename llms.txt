@@ -1,0 +1,22 @@
+# batiFlow
+
+> batiFlow est un service en ligne pour les artisans et professionnels du bâtiment (peintres, maçons, plombiers, électriciens, plaquistes) : comptes rendus de chantier par dictée vocale, devis détaillés en PDF, rappels de relance clients, photos de chantier, planning et équipe (offre Pro). Essai gratuit de 7 jours. Langue : français.
+
+## Pages principales
+- [Accueil, fonctionnalités, tarifs, FAQ et contact](index.html)
+- [Connexion à l'espace client](login.html)
+
+## Tarifs (TTC)
+- Essentiel : 35 € par mois ou 350 € par an
+- Pro : 70 € par mois ou 700 € par an (équipe jusqu'à 5 utilisateurs, planning partagé, statistiques, support prioritaire)
+
+## Informations légales
+- [Mentions légales](mentions-legales.html)
+- [Conditions générales de vente](cgv.html)
+- [Conditions générales d'utilisation](cgu.html)
+- [Politique de remboursement](remboursement.html)
+- [Politique de confidentialité](confidentialite.html)
+- [Politique de cookies](cookies.html)
+
+## Contact
+- batiFlow23@gmail.com

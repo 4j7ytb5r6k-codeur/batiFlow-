@@ -13,15 +13,17 @@
   <meta property="og:description" content="Comptes rendus par dictée, suivi des devis et rappels de relance pour les artisans du BTP. Essai gratuit 7 jours.">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Cpath d='M16 7 6 15h3v9h14v-9h3z' fill='none' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"batiFlow","applicationCategory":"BusinessApplication","operatingSystem":"Web","inLanguage":"fr","description":"Comptes rendus par dictée vocale, devis et relances pour les artisans du bâtiment.","offers":[{"@type":"Offer","name":"Essentiel","price":"35","priceCurrency":"EUR","description":"35 € TTC par mois ou 350 € TTC par an. Essai gratuit de 7 jours."},{"@type":"Offer","name":"Pro","price":"70","priceCurrency":"EUR","description":"70 € TTC par mois ou 700 € TTC par an. Essai gratuit de 7 jours."}]}</script>
   <script>document.documentElement.classList.add("js")</script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<a class="skip-link" href="#contenu">Aller au contenu</a>
 
 <header class="nav" id="top">
   <div class="container nav__inner">
     <a href="#top" class="logo" aria-label="batiFlow, accueil">
-      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#2563eb"/><path d="M16 7 6 15h3v9h14v-9h3z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
+      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#2563eb"/><path d="M16 7 6 15h3v9h14v-9h3z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
       <span class="logo__t">bati<span>Flow</span></span>
     </a>
     <nav class="nav__links" id="menu" aria-label="Navigation principale">
@@ -39,7 +41,7 @@
   </div>
 </header>
 
-<main>
+<main id="contenu">
   <!-- HERO -->
   <section class="hero">
     <div class="container hero__inner">
@@ -118,7 +120,7 @@
         </div>
         <div class="feature__visual">
           <div class="mic"><span class="mic__btn" aria-hidden="true">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>
+            <svg aria-hidden="true" focusable="false" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>
             <strong>Cliquez pour dicter</strong><small>ou saisissez votre compte rendu</small>
             <span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
         </div>
@@ -259,21 +261,20 @@
     <div class="container container--narrow">
       <h2>Démarrez votre essai gratuit de 7 jours</h2>
       <p class="lead">Créez votre compte en une minute, puis choisissez votre offre. Votre moyen de paiement est demandé à ce moment-là : vous n'êtes débité qu'à la fin des 7 jours.</p>
-      <form id="trialForm" class="form" name="essai-gratuit" method="POST" action="/merci.html" data-netlify="true" netlify-honeypot="bot-field" novalidate>
-        <input type="hidden" name="form-name" value="essai-gratuit">
-        <p class="hp" aria-hidden="true"><label>Ne pas remplir <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
+      <form id="trialForm" class="form" novalidate>
         <div class="field"><label for="name">Nom et prénom</label><input id="name" name="name" type="text" autocomplete="name" required></div>
-        <div class="field"><label for="company">Entreprise</label><input id="company" name="company" type="text" autocomplete="organization"></div>
+        <div class="field"><label for="company">Entreprise <small>(facultatif)</small></label><input id="company" name="company" type="text" autocomplete="organization"></div>
         <div class="field"><label for="trade">Votre métier</label>
           <select id="trade" name="trade" required>
             <option value="">Choisir…</option><option>Peintre</option><option>Maçon</option><option>Plombier</option><option>Électricien</option><option>Plaquiste</option><option>Autre</option>
           </select></div>
         <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required></div>
-        <div class="field"><label for="phone">Téléphone</label><input id="phone" name="phone" type="tel" autocomplete="tel"></div>
+        <div class="field"><label for="phone">Téléphone <small>(facultatif)</small></label><input id="phone" name="phone" type="tel" autocomplete="tel"></div>
         <div class="field" id="passwordField" hidden><label for="password">Mot de passe (8 caractères minimum)</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="8"></div>
+        <div class="field form__check"><input id="accept" name="accept" type="checkbox" required><label for="accept">Je suis un professionnel et j'ai lu et j'accepte les <a href="cgv.html">conditions générales de vente</a> et les <a href="cgu.html">conditions d'utilisation</a>. J'ai pris connaissance de la <a href="confidentialite.html">politique de confidentialité</a>.</label></div>
         <button class="btn btn--primary btn--lg btn--block" type="submit">Je commence mon essai gratuit</button>
         <p class="form__msg" id="formMsg" role="status" aria-live="polite"></p>
-        <p class="form__legal">En créant votre compte, vous acceptez les <a href="cgv.html" style="color:var(--blue);font-weight:700">conditions générales</a> et la <a href="confidentialite.html" style="color:var(--blue);font-weight:700">politique de confidentialité</a>. Vous avez déjà un compte ? <a href="login.html" style="color:var(--blue);font-weight:700">Connexion</a></p>
+        <p class="form__legal">Vous avez déjà un compte ? <a href="login.html" style="color:var(--blue);font-weight:700">Connexion</a></p>
       </form>
     </div>
   </section>
@@ -284,7 +285,7 @@
     <span class="logo logo--light">bati<span>Flow</span></span>
     <small>© <span id="year"></span> batiFlow. Tous droits réservés.</small>
     <nav><a href="#fonctionnalites">Fonctionnalités</a><a href="#tarifs">Tarifs</a><a href="#faq">FAQ</a><a href="#contact">Contact</a></nav>
-    <nav class="footer__legal"><a href="mentions-legales.html">Mentions légales</a><a href="cgv.html">CGV</a><a href="confidentialite.html">Confidentialité</a></nav>
+    <nav class="footer__legal" aria-label="Informations légales"><a href="mentions-legales.html">Mentions légales</a><a href="cgv.html">CGV</a><a href="cgu.html">CGU</a><a href="remboursement.html">Remboursement</a><a href="confidentialite.html">Confidentialité</a><a href="cookies.html">Cookies</a></nav>
   </div>
 </footer>
 
