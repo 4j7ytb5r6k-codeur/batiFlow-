@@ -404,3 +404,21 @@ begin
 end; $$;
 revoke execute on function public.apply_payment(text, text, boolean) from public, anon, authenticated;
 grant execute on function public.apply_payment(text, text, boolean) to service_role;
+
+-- ============ Acceptation des CGV/CGU (appliqué le 13/10/2026) ============
+-- L'espace client affiche les conditions à la première connexion et à chaque nouvelle version (CGV_VERSION dans app.js).
+-- La date d'acceptation est posée par le serveur (non modifiable par le client).
+alter table public.profiles add column if not exists cgv_version text, add column if not exists cgv_accepted_at timestamptz;
+grant update (cgv_version) on public.profiles to authenticated;
+create or replace function public.profiles_guard() returns trigger language plpgsql set search_path = public as $$
+begin
+  if auth.uid() is not null and not private.is_admin() and (
+       new.plan is distinct from old.plan or new.billing is distinct from old.billing or new.trial_ends_at is distinct from old.trial_ends_at
+    or new.is_admin is distinct from old.is_admin or new.email is distinct from old.email or new.id is distinct from old.id
+    or new.subscription_status is distinct from old.subscription_status or new.current_period_end is distinct from old.current_period_end
+    or new.cancel_at_period_end is distinct from old.cancel_at_period_end or new.cgv_accepted_at is distinct from old.cgv_accepted_at) then
+    raise exception 'Modification non autorisee';
+  end if;
+  if new.cgv_version is distinct from old.cgv_version then new.cgv_accepted_at := now(); end if;
+  return new;
+end; $$;

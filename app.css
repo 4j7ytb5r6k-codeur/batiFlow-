@@ -196,3 +196,13 @@
 }
 
 .d-dialog{margin:auto}
+/* Acceptation des conditions générales */
+.d-terms .d-card>p:first-child{color:var(--text);font-size:1rem;margin-bottom:14px}
+.d-terms__item{border:1px solid var(--line);border-radius:12px;margin:10px 0;background:#fbfcfe}
+.d-terms__item summary{cursor:pointer;padding:12px 16px;font-weight:700;color:var(--navy)}
+.d-terms__doc{max-height:340px;overflow:auto;padding:4px 16px 16px;font-size:.9rem;line-height:1.55;color:var(--text)}
+.d-terms__doc h2{font-size:1rem;margin:14px 0 4px;color:var(--navy)}
+.d-terms__doc p,.d-terms__doc li{color:var(--text);margin:4px 0}
+.d-terms__doc ul{padding-left:20px}
+.d-terms__check{display:flex;gap:10px;align-items:flex-start;margin:16px 0 4px;font-weight:600;color:var(--text)}
+.d-terms__check input{width:20px;height:20px;margin-top:2px;flex:none}

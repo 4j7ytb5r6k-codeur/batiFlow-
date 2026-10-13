@@ -7,6 +7,7 @@
   const TABLE = { clients: 'clients', chantiers: 'chantiers', devis: 'devis', crs: 'comptes_rendus' };
   const STEPS = [3, 7, 14];
   const DAY = 864e5;
+  const CGV_VERSION = '2026-10-13'; // à changer à chaque modification des CGV/CGU : chaque utilisateur devra les accepter à nouveau
   const PLANS = { essentiel: { name: 'Essentiel', month: 35, year: 350 }, pro: { name: 'Pro', month: 70, year: 700 } };
   const S = { user: null, profile: null, ws: null, wp: null, role: 'owner', people: [], members: [], invites: [], clients: [], chantiers: [], devis: [], crs: [],
     view: 'dashboard', demo: !client, planningStart: null, billingPeriod: 'month', notice: '', photoCh: null, photos: [], photoUrls: {}, photosReady: false, demoPhotos: [] };
@@ -711,6 +712,49 @@
     openForm({ title: 'Supprimer ' + label + ' ?', submitLabel: 'Supprimer', fields: [], onSubmit: () => del(k, item.id) });
   }
 
+  // ---------- Acceptation des conditions générales (à la création du compte, puis à chaque nouvelle version) ----------
+  const legalCache = new Map();
+  async function loadLegal(url, target) {
+    try {
+      if (!legalCache.has(url)) {
+        const r = await fetch(url, { cache: 'no-cache' }); if (!r.ok) throw new Error(r.status);
+        const main = new DOMParser().parseFromString(await r.text(), 'text/html').querySelector('main');
+        main.querySelectorAll('h1, .todo, script').forEach((n) => n.remove());
+        main.querySelectorAll('a').forEach((a) => { a.target = '_blank'; a.rel = 'noopener'; });
+        legalCache.set(url, Array.from(main.children));
+      }
+      target.replaceChildren(...legalCache.get(url).map((n) => document.importNode(n, true)));
+    } catch {
+      target.replaceChildren(el('p', null, 'Affichage impossible ici : ', el('a', { href: url, target: '_blank', rel: 'noopener', text: 'ouvrir le document' }), '.'));
+    }
+  }
+  function viewTerms() {
+    const doc = (title, url, open) => { const body = el('div', { class: 'd-terms__doc', tabindex: '0', 'aria-label': title }, el('p', { class: 'd-muted', text: 'Chargement…' })); loadLegal(url, body);
+      return el('details', { class: 'd-terms__item', open }, el('summary', { text: title }), body); };
+    const box = el('input', { type: 'checkbox', id: 'termsOk' });
+    const msg = el('p', { class: 'form__msg', role: 'alert' });
+    const btn = el('button', { type: 'button', class: 'btn btn--primary', disabled: true, text: 'J\'accepte et j\'accède à mon espace' });
+    box.addEventListener('change', () => { btn.disabled = !box.checked; });
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      const { data, error } = await client.from('profiles').update({ cgv_version: CGV_VERSION }).eq('id', S.user.id).select().single();
+      if (error) { msg.textContent = 'Enregistrement impossible : ' + error.message; msg.className = 'form__msg is-error'; btn.disabled = false; return; }
+      Object.assign(S.profile, data); if (S.role === 'owner') S.wp = S.profile;
+      S.termsPending = false; render(); window.scrollTo(0, 0);
+    });
+    const first = !S.profile.cgv_version;
+    return el('div', { class: 'd-terms' }, head(first ? 'Bienvenue sur batiFlow' : 'Nos conditions ont changé'),
+      el('div', { class: 'd-card' },
+        el('p', { text: first ? 'Avant d\'accéder à votre espace, merci de lire et d\'accepter nos conditions générales. Votre essai gratuit de 7 jours démarre dès maintenant, sans carte bancaire.'
+          : 'Nos conditions générales ont été mises à jour. Merci de les lire et de les accepter pour continuer à utiliser batiFlow.' }),
+        doc('Conditions générales de vente (CGV)', 'cgv.html', true),
+        doc('Conditions générales d\'utilisation (CGU)', 'cgu.html', false),
+        el('p', { class: 'd-muted' }, 'Le traitement de vos données est décrit dans la ', el('a', { href: 'confidentialite.html', target: '_blank', rel: 'noopener', text: 'politique de confidentialité' }), '.'),
+        el('div', { class: 'd-terms__check' }, box, el('label', { for: 'termsOk', text: 'Je suis un professionnel du bâtiment, j\'ai lu et j\'accepte les conditions générales de vente et d\'utilisation.' })),
+        el('div', { class: 'd-actions d-actions--inline' }, btn), msg,
+        el('p', { class: 'd-muted', text: 'Si vous ne souhaitez pas les accepter, déconnectez-vous ; vous pouvez nous écrire pour faire supprimer votre compte.' })));
+  }
+
   // ---------- Rendu général ----------
   const VIEWS = { dashboard: viewDashboard, chantiers: viewChantiers, devis: viewDevis, crs: viewCrs, clients: viewClients, planning: viewPlanning, stats: viewStats, team: viewTeam, account: viewAccount, photos: viewPhotos };
   function banner() {
@@ -725,6 +769,7 @@
     else if (!canWrite()) b.append(el('p', { class: 'd-banner d-banner--warn', text: 'L\'offre de votre équipe est inactive : l\'espace est en lecture seule.' }));
   }
   function render() {
+    if (S.termsPending) { $('banner').replaceChildren(); $('view').replaceChildren(viewTerms()); $('trial').textContent = 'Conditions à accepter'; return; }
     banner();
     $('view').replaceChildren(VIEWS[S.view]());
     document.querySelectorAll('#sideNav button').forEach((b) => b.classList.toggle('is-active', b.dataset.view === (S.view === 'photos' ? 'chantiers' : S.view)));
@@ -771,6 +816,7 @@
       S.members = [{ owner_id: 'demo', member_id: 'demo2' }];
     }
     paintUser();
+    S.termsPending = !!client && profile.cgv_version !== CGV_VERSION;
     // Lien d'administration : créé uniquement pour un administrateur, absent du HTML des clients.
     if (profile.is_admin) $('sideNav').append(el('a', { href: 'admin.html', text: 'Administration' }));
     if (CFG.CONTACT_EMAIL) $('helpLink').href = 'mailto:' + CFG.CONTACT_EMAIL;
