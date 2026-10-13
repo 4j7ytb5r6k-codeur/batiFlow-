@@ -14,7 +14,7 @@ create table if not exists public.profiles (
   trial_ends_at timestamptz not null default (now() + interval '7 days'),
   is_admin      boolean not null default false,
   company_address text, siret text, tva_mention text,
-  stripe_customer_id text, stripe_subscription_id text, subscription_status text,
+  stripe_customer_id text, stripe_subscription_id text, subscription_status text, -- colonnes stripe_* inutilisées (ancien prestataire)
   cancel_at_period_end boolean not null default false, current_period_end timestamptz,
   created_at    timestamptz not null default now()
 );
@@ -227,7 +227,7 @@ create trigger contact_set_user before insert on public.contact_messages for eac
 -- règles et sans danger ; vous pouvez les supprimer dans le SQL Editor : drop policy "clients_own" on public.clients; etc.
 
 -- ============ Informations d'entreprise modifiables par le client (protégées) ============
--- Un client ne peut modifier que ses coordonnées : offre, essai, rôle admin, email et champs Stripe sont verrouillés par ce déclencheur
+-- Un client ne peut modifier que ses coordonnées : offre, essai, rôle admin, email et échéances sont verrouillés par ce déclencheur
 -- (seuls un administrateur ou le serveur peuvent les changer). Testé : un client ne peut ni changer d'offre ni se rendre administrateur.
 create or replace function public.profiles_guard() returns trigger language plpgsql set search_path = public as $$
 begin
@@ -265,8 +265,7 @@ create policy "chantier_photos_workspace" on storage.objects for all to authenti
   with check (bucket_id = 'chantier-photos' and case when (storage.foldername(name))[1] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then public.can_access(((storage.foldername(name))[1])::uuid) else false end);
 
 -- ============ Essai gratuit avec moyen de paiement obligatoire ============
--- Un nouveau compte a plan = 'trial' : "inscrit, sans offre". Il choisit une offre ; Stripe démarre alors l'essai de 7 jours
--- (carte enregistrée, premier débit à la fin) et le webhook passe le profil en 'essentiel' ou 'pro' (subscription_status = 'trialing').
+-- (Version d'origine, remplacée par la section « Paiement Crédit Mutuel » en fin de fichier.)
 -- Sans offre active ('trial' ou 'annule'), toute création ou modification de données est refusée côté serveur (la suppression reste possible).
 create or replace function public.workspace_writable(ws uuid) returns boolean language sql stable security definer set search_path = public as $$
   select coalesce((select p.plan in ('essentiel','pro') or p.is_admin from public.profiles p where p.id = ws), false) $$;
@@ -287,3 +286,121 @@ create trigger comptes_rendus_writable before insert or update on public.comptes
 create trigger photos_writable before insert or update on public.photos for each row execute function public.require_writable();
 create policy "chantier_photos_need_offer" on storage.objects as restrictive for insert to authenticated
   with check (bucket_id <> 'chantier-photos' or case when (storage.foldername(name))[1] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then public.workspace_writable(((storage.foldername(name))[1])::uuid) else false end);
+
+-- ============ Paiement Crédit Mutuel (Monetico) avec activation automatique (appliqué le 13/10/2026) ============
+-- Essai gratuit de 7 jours (offre Pro) démarré automatiquement à l'inscription, sans moyen de paiement.
+-- Chaque paiement accepté par la banque active l'offre et ajoute un mois ou un an à l'échéance (current_period_end).
+-- L'accès est actif si l'offre est Essentiel ou Pro et l'échéance non dépassée (3 jours de tolérance après une période payée).
+-- Échéance vide = offre offerte sans limite de durée (attribuée à la main dans l'administration).
+alter table public.profiles alter column plan set default 'pro';
+alter table public.profiles alter column subscription_status set default 'trialing';
+alter table public.profiles alter column current_period_end set default (now() + interval '7 days');
+
+-- Fonctions internes des règles de sécurité : hors de l'API publique (non appelables via /rest/v1/rpc)
+create schema if not exists private;
+revoke all on schema private from public, anon;
+grant usage on schema private to authenticated, service_role;
+alter function public.is_admin() set schema private;
+alter function public.can_access(uuid) set schema private;
+alter function public.workspace_writable(uuid) set schema private;
+alter function public.team_profile_ids() set schema private;
+
+create or replace function private.active_plan(ws uuid) returns text language sql stable security definer set search_path = public as $$
+  select case when p.plan in ('essentiel','pro') and (p.current_period_end is null
+    or p.current_period_end + case when p.subscription_status = 'trialing' then interval '0' else interval '3 days' end > now())
+    then p.plan end from public.profiles p where p.id = ws $$;
+revoke execute on function private.active_plan(uuid) from public, anon;
+grant execute on function private.active_plan(uuid) to authenticated;
+
+create or replace function private.workspace_writable(ws uuid) returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce((select p.is_admin or private.active_plan(p.id) is not null from public.profiles p where p.id = ws), false) $$;
+
+create or replace function private.can_access(ws uuid) returns boolean language sql stable security definer set search_path = public as $$
+  select (select auth.uid()) is not null and (ws = (select auth.uid()) or (private.active_plan(ws) = 'pro' and exists (
+    select 1 from public.team_members tm where tm.owner_id = ws and tm.member_id = (select auth.uid())))) $$;
+
+create or replace function public.require_writable() returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is not null and not private.workspace_writable(new.owner_id) then
+    raise exception 'Offre requise : choisissez une offre pour continuer';
+  end if;
+  return new;
+end; $$;
+
+create or replace function public.enforce_team_invite() returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.email := lower(trim(new.email));
+  if coalesce(private.active_plan(new.owner_id), '') <> 'pro' then raise exception 'Invitation reservee a l''offre Pro'; end if;
+  if new.email = lower(coalesce((select email from auth.users where id = new.owner_id), '')) then raise exception 'Vous ne pouvez pas vous inviter vous-meme'; end if;
+  if (select count(*) from public.team_members where owner_id = new.owner_id) + (select count(*) from public.team_invites where owner_id = new.owner_id and accepted_at is null) >= 4 then raise exception 'Limite de 5 utilisateurs atteinte'; end if;
+  return new;
+end; $$;
+
+create or replace function public.accept_team_invites() returns void language plpgsql security definer set search_path = public as $$
+declare o uuid;
+begin
+  o := public.pending_invite_owner(); if o is null then return; end if;
+  if not exists (select 1 from public.team_members where member_id = (select auth.uid()))
+     and (select count(*) from public.team_members where owner_id = o) < 4
+     and private.active_plan(o) = 'pro' then
+    insert into public.team_members (owner_id, member_id) values (o, (select auth.uid()));
+  end if;
+  update public.team_invites i set accepted_at = now() from auth.users u
+   where u.id = (select auth.uid()) and lower(i.email) = lower(u.email) and i.accepted_at is null;
+end; $$;
+
+create or replace function public.profiles_guard() returns trigger language plpgsql set search_path = public as $$
+begin
+  if auth.uid() is not null and not private.is_admin() and (
+       new.plan is distinct from old.plan or new.billing is distinct from old.billing or new.trial_ends_at is distinct from old.trial_ends_at
+    or new.is_admin is distinct from old.is_admin or new.email is distinct from old.email or new.id is distinct from old.id
+    or new.subscription_status is distinct from old.subscription_status or new.current_period_end is distinct from old.current_period_end
+    or new.cancel_at_period_end is distinct from old.cancel_at_period_end) then
+    raise exception 'Modification non autorisee';
+  end if;
+  return new;
+end; $$;
+grant update (subscription_status, current_period_end) on public.profiles to authenticated;
+
+-- Paiements : conservés 10 ans (comptabilité), même après suppression du compte
+create table if not exists public.payments (
+  id uuid primary key default gen_random_uuid(),
+  reference text not null unique,
+  owner_id uuid references auth.users (id) on delete set null,
+  email text,
+  plan text not null check (plan in ('essentiel','pro')),
+  billing text not null check (billing in ('month','year')),
+  amount numeric(10,2) not null,
+  status text not null default 'en_attente' check (status in ('en_attente','paye','refuse')),
+  period_end timestamptz,
+  last_notification text,
+  created_at timestamptz not null default now(),
+  paid_at timestamptz);
+alter table public.payments enable row level security;
+revoke all on public.payments from anon, authenticated;
+grant select on public.payments to authenticated;
+create policy "payments_select" on public.payments for select to authenticated using (owner_id = (select auth.uid()) or private.is_admin());
+create index if not exists payments_owner_idx on public.payments (owner_id);
+
+-- Appelée uniquement par la fonction serveur « paiement » après vérification du sceau de la banque
+create or replace function public.apply_payment(ref text, notif text, ok boolean) returns text language plpgsql security definer set search_path = public as $$
+declare pay public.payments; per interval; new_end timestamptz;
+begin
+  select * into pay from public.payments where reference = ref for update;
+  if not found then return 'reference_inconnue'; end if;
+  if not ok then
+    if pay.status = 'en_attente' then update public.payments set status = 'refuse' where id = pay.id; end if;
+    return 'refuse';
+  end if;
+  if pay.status = 'paye' and pay.last_notification is not distinct from notif then return 'deja_traite'; end if;
+  per := case pay.billing when 'year' then interval '1 year' else interval '1 month' end;
+  if pay.owner_id is not null then
+    select greatest(coalesce(p.current_period_end, now()), now()) + per into new_end from public.profiles p where p.id = pay.owner_id;
+    update public.profiles set plan = pay.plan, billing = pay.billing, subscription_status = 'active',
+      cancel_at_period_end = false, current_period_end = new_end where id = pay.owner_id;
+  end if;
+  update public.payments set status = 'paye', paid_at = coalesce(paid_at, now()), last_notification = notif, period_end = new_end where id = pay.id;
+  return 'ok';
+end; $$;
+revoke execute on function public.apply_payment(text, text, boolean) from public, anon, authenticated;
+grant execute on function public.apply_payment(text, text, boolean) to service_role;

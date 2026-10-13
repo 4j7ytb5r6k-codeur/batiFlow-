@@ -1,4 +1,4 @@
-// Administration batiFlow : réservée aux comptes is_admin (règles RLS côté base). CA estimé = offres attribuées, pas des encaissements.
+// Administration batiFlow : réservée aux comptes is_admin (règles RLS côté base). Encaissements = paiements Crédit Mutuel acceptés.
 (function () {
   'use strict';
   const client = window.bfClient;
@@ -17,23 +17,24 @@
     for (const kid of kids.flat()) { if (kid == null || kid === false) continue; e.append(kid.nodeType ? kid : document.createTextNode(String(kid))); }
     return e;
   }
-  const state = { profiles: [], messages: [], q: '' };
+  const state = { profiles: [], messages: [], payments: [], q: '' };
+  const active = (p) => (p.plan === 'essentiel' || p.plan === 'pro') && (!p.current_period_end || new Date(p.current_period_end).getTime() + (p.subscription_status === 'trialing' ? 0 : 3 * DAY) > Date.now());
 
   function stats() {
     const now = Date.now(), cl = state.profiles.filter((p) => !p.is_admin);
-    const has = (p) => p.plan === 'essentiel' || p.plan === 'pro';
-    const trialing = cl.filter((p) => has(p) && p.subscription_status === 'trialing');
-    const paying = cl.filter((p) => has(p) && p.subscription_status !== 'trialing');
-    const noOffer = cl.filter((p) => p.plan === 'trial');
-    const started = cl.length - noOffer.length;
+    const trialing = cl.filter((p) => active(p) && p.subscription_status === 'trialing');
+    const paying = cl.filter((p) => active(p) && p.subscription_status !== 'trialing');
+    const noOffer = cl.filter((p) => !active(p));
+    const started = cl.length;
+    const paid30 = state.payments.filter((x) => x.status === 'paye' && now - new Date(x.paid_at) < 30 * DAY).reduce((s, x) => s + Number(x.amount), 0);
     const mrr = paying.reduce((s, p) => s + PRICE_MONTHLY[p.plan][p.billing === 'year' ? 'year' : 'month'], 0);
     return {
       total: cl.length, noOffer: noOffer.length,
       new7: cl.filter((p) => now - new Date(p.created_at) < 7 * DAY).length,
       trialActive: trialing.length,
-      trialSoon: trialing.filter((p) => { const l = new Date(p.trial_ends_at) - now; return l > 0 && l < 2 * DAY; }).length,
+      trialSoon: trialing.filter((p) => { const l = new Date(p.current_period_end) - now; return l > 0 && l < 2 * DAY; }).length, paid30,
       essentiel: paying.filter((p) => p.plan === 'essentiel').length, pro: paying.filter((p) => p.plan === 'pro').length,
-      cancelled: cl.filter((p) => p.plan === 'annule').length,
+      cancelled: cl.filter((p) => p.plan === 'annule' || (!active(p) && p.subscription_status === 'active')).length,
       mrr, arr: mrr * 12, conv: started ? Math.round((paying.length / started) * 100) : 0,
     };
   }
@@ -70,23 +71,31 @@
     const open = state.messages.filter((m) => !m.handled).length;
     root.replaceChildren(
       el('h1', { text: 'Tableau de bord administrateur' }),
-      el('section', { class: 'd-stats' }, kpi(s.total, 'Clients inscrits', s.new7 + ' cette semaine · ' + s.noOffer + ' sans offre'), kpi(s.trialActive, 'Essais en cours (carte enregistrée)', s.trialSoon + ' se terminent sous 48 h'),
+      el('section', { class: 'd-stats' }, kpi(s.total, 'Clients inscrits', s.new7 + ' cette semaine · ' + s.noOffer + ' sans offre active'), kpi(s.trialActive, 'Essais gratuits en cours', s.trialSoon + ' se terminent sous 48 h'),
         kpi(s.essentiel + s.pro, 'Abonnés', s.essentiel + ' Essentiel · ' + s.pro + ' Pro'), kpi(s.conv + ' %', 'Conversion essai → payant', 'parmi ceux qui ont démarré un essai')),
-      el('section', { class: 'd-stats d-stats--3' }, kpi(eur.format(s.mrr), 'CA mensuel estimé (TTC)', 'Calculé d\'après les offres attribuées'), kpi(eur.format(s.arr), 'CA annuel estimé (TTC)', 'MRR × 12'), kpi(s.cancelled, 'Abonnements résiliés')),
-      el('p', { class: 'd-note', text: 'Le chiffre d\'affaires est une estimation basée sur l\'offre et la facturation que vous attribuez à chaque client. Il ne reflète pas des encaissements réels tant qu\'aucun système de paiement n\'est branché.' }),
+      el('section', { class: 'd-stats d-stats--3' }, kpi(eur.format(s.paid30), 'Encaissé sur 30 jours (TTC)', 'Paiements Crédit Mutuel acceptés'), kpi(eur.format(s.mrr), 'CA mensuel estimé (TTC)', 'D\'après les offres actives'), kpi(s.cancelled, 'Résiliés ou non renouvelés')),
+      el('p', { class: 'd-note', text: 'Les offres sont activées et prolongées automatiquement à chaque paiement accepté par le Crédit Mutuel. Vous pouvez aussi offrir une offre à la main : choisissez-la et videz la date d\'échéance pour un accès sans limite de durée.' }),
       el('div', { class: 'd-card' }, el('h2', { text: 'Inscriptions des 14 derniers jours' }), chart()),
       el('div', { class: 'd-card' },
         el('div', { class: 'a-head' }, el('h2', { text: 'Clients (' + list.length + ')' }), el('input', { type: 'search', placeholder: 'Rechercher…', 'aria-label': 'Rechercher un client', value: state.q, oninput: (e) => { state.q = e.target.value; const pos = e.target.selectionStart; render(); const i = root.querySelector('input[type=search]'); i.focus(); i.setSelectionRange(pos, pos); } })),
         el('div', { class: 'a-scroll' }, el('table', { class: 'a-table' },
-          el('thead', null, el('tr', null, ['Client', 'Contact', 'Inscrit le', 'Offre', 'Facturation', 'Fin d\'essai'].map((h) => el('th', { scope: 'col', text: h })))),
+          el('thead', null, el('tr', null, ['Client', 'Contact', 'Inscrit le', 'Offre', 'Facturation', 'Statut', 'Échéance'].map((h) => el('th', { scope: 'col', text: h })))),
           el('tbody', null, list.map((p) => el('tr', null,
-            el('td', null, el('strong', { text: p.full_name || '—' }), el('small', { text: [p.company, p.trade].filter(Boolean).join(' · ') }), p.is_admin ? el('em', { class: 'tag tag--blue', text: 'admin' }) : null, p.stripe_subscription_id ? el('em', { class: 'tag tag--green', text: p.cancel_at_period_end ? 'Stripe · résilie' : 'Stripe' }) : null),
+            el('td', null, el('strong', { text: p.full_name || '—' }), el('small', { text: [p.company, p.trade].filter(Boolean).join(' · ') }), p.is_admin ? el('em', { class: 'tag tag--blue', text: 'admin' }) : null),
             el('td', null, el('a', { href: 'mailto:' + (p.email || ''), text: p.email || '—' }), el('small', { text: p.phone || '' })),
             el('td', { text: fdate(p.created_at) }),
             el('td', null, sel([['trial', 'Sans offre'], ['essentiel', 'Essentiel'], ['pro', 'Pro'], ['annule', 'Résilié']], p.plan, (v) => updateProfile(p.id, { plan: v }), 'Offre de ' + (p.full_name || p.email))),
             el('td', null, sel([['month', 'Mensuel'], ['year', 'Annuel']], p.billing || 'month', (v) => updateProfile(p.id, { billing: v }), 'Facturation de ' + (p.full_name || p.email))),
-            el('td', { text: p.subscription_status === 'trialing' ? fdate(p.trial_ends_at) : '—' })))))),
+            el('td', null, el('em', { class: 'tag ' + (active(p) ? 'tag--green' : 'tag--gray'), text: !active(p) ? 'Inactif' : p.subscription_status === 'trialing' ? 'Essai' : p.current_period_end ? 'Payé' : 'Offert' })),
+            el('td', null, el('input', { type: 'date', 'aria-label': 'Échéance de ' + (p.full_name || p.email), value: p.current_period_end ? p.current_period_end.slice(0, 10) : '',
+              onchange: (e) => updateProfile(p.id, { current_period_end: e.target.value ? new Date(e.target.value + 'T23:59:59').toISOString() : null, subscription_status: p.subscription_status === 'trialing' && !e.target.value ? 'active' : p.subscription_status }) }))))))),
         list.length ? null : el('p', { class: 'd-muted', text: 'Aucun client ne correspond.' })),
+      el('div', { class: 'd-card' }, el('h2', { text: 'Derniers paiements' }),
+        state.payments.length ? el('div', { class: 'a-scroll' }, el('table', { class: 'a-table' },
+          el('thead', null, el('tr', null, ['Date', 'Client', 'Offre', 'Montant', 'Statut', 'Référence'].map((h) => el('th', { scope: 'col', text: h })))),
+          el('tbody', null, state.payments.slice(0, 50).map((x) => el('tr', null, el('td', { text: fdate(x.paid_at || x.created_at) }), el('td', { text: x.email || '—' }),
+            el('td', { text: (x.plan === 'pro' ? 'Pro' : 'Essentiel') + ' ' + (x.billing === 'year' ? 'annuel' : 'mensuel') }), el('td', { text: eur.format(x.amount) }),
+            el('td', null, el('em', { class: 'tag ' + (x.status === 'paye' ? 'tag--green' : 'tag--gray'), text: x.status === 'paye' ? 'Payé' : x.status === 'refuse' ? 'Refusé' : 'Abandonné / en attente' })), el('td', { text: x.reference })))))) : el('p', { class: 'd-muted', text: 'Aucun paiement pour le moment.' })),
       el('div', { class: 'd-card' }, el('h2', { text: 'Messages reçus (' + open + ' à traiter)' }),
         inbox.length ? el('ul', { class: 'd-rows d-rows--wide' }, inbox.map((m) => el('li', { class: 'd-cr' + (m.handled ? ' is-done' : '') },
           el('div', null, el('strong', { text: m.name + ' · ' + fdate(m.created_at) }), isPro(m) ? el('em', { class: 'pro', text: 'Pro · prioritaire' }) : null, el('small', null, el('a', { href: 'mailto:' + m.email + '?subject=' + encodeURIComponent('Votre message à batiFlow'), text: m.email })), el('p', { class: 'd-crtext', text: m.message })),
@@ -100,12 +109,13 @@
     if (!data.session) { location.replace('login.html'); return; }
     const { data: me } = await client.from('profiles').select('is_admin').eq('id', data.session.user.id).maybeSingle();
     if (!me || !me.is_admin) { location.replace('app.html'); return; }
-    const [p, m] = await Promise.all([
+    const [p, m, pay] = await Promise.all([
       client.from('profiles').select('*').order('created_at', { ascending: false }),
       client.from('contact_messages').select('*').order('created_at', { ascending: false }),
+      client.from('payments').select('*').order('created_at', { ascending: false }).limit(200),
     ]);
     if (p.error || m.error) { document.body.hidden = false; root.replaceChildren(el('p', { class: 'd-banner d-banner--warn', text: 'Chargement impossible : ' + (p.error || m.error).message })); return; }
-    state.profiles = p.data || []; state.messages = m.data || [];
+    state.profiles = p.data || []; state.messages = m.data || []; state.payments = (pay && pay.data) || [];
     document.body.hidden = false; render();
   }
   start();

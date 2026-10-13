@@ -30,26 +30,27 @@ Pages : `login.html` (connexion), `app.html` (espace client : clients, chantiers
 - **RGPD** : polices et bibliothèques (Supabase, jsPDF) hébergées avec le site (`fonts/`, `vendor/`), aucun traceur. Les PDF sont générés dans le navigateur du client : aucune donnée n'est envoyée à un tiers.
 - **Devis PDF** : `devis-pdf.js` (lignes, TVA par taux, total TTC). L'en-tête reprend les informations d'entreprise du client (Mon compte).
 - **Photos** : bucket privé `chantier-photos`, images réduites à 1600 px côté navigateur, 5 Mo max, 60 photos par chantier.
-- **CA** : le CA de l'administration est une estimation d'après l'offre attribuée à chaque client, pas des encaissements (pas de paiement en ligne pour l'instant).
+- **CA** : l'administration affiche les encaissements réels (paiements acceptés par la banque) et une estimation mensuelle d'après les offres actives.
 
-## Offre Pro et abonnements (Stripe)
+## Offre Pro et paiement (Crédit Mutuel / Monetico)
 
-- **Essai gratuit avec carte obligatoire** : après l'inscription, le client choisit une offre ; Stripe Checkout enregistre sa carte et démarre un essai de 7 jours (aucun débit avant la fin). Le premier débit a lieu à la fin de l'essai, sauf annulation avant. Sans offre active, l'espace est en lecture seule, y compris côté base de données (déclencheurs `require_writable`). Un seul essai par compte.
-- **Offre Pro** (déjà en place) : équipe jusqu'à 5 utilisateurs (Équipe), planning partagé avec chantiers assignés (Planning), statistiques détaillées (Statistiques), support prioritaire (messages marqués « Pro » dans l'administration). Les fonctions Pro sont réservées à l'offre Pro (y compris pendant son essai gratuit).
-- **Changement d'offre sans contact** : depuis « Mon compte », le client souscrit, change d'offre (prorata automatique), résilie ou reprend son abonnement, et accède à ses factures. Cela passe par les fonctions Supabase `billing` et `stripe-webhook` (dossier `supabase/functions/`, déjà déployées).
-- **Tant que Stripe n'est pas configuré**, ces boutons affichent « Le paiement en ligne n'est pas encore activé ». Activation :
-  1. Créez un compte sur https://stripe.com et activez le mode test (puis le mode production quand tout est validé).
-  2. Stripe > Développeurs > Clés API : copiez la clé secrète (`sk_test_...`).
-  3. Supabase > Edge Functions > Secrets : ajoutez `STRIPE_SECRET_KEY` (la clé), `SITE_URL` (l'adresse du site, ex. `https://batiflow.fr`, plusieurs adresses séparées par des virgules).
-  4. Stripe > Développeurs > Webhooks > Ajouter un point de terminaison : URL `https://yvdkrrkrxiizyelivtlv.supabase.co/functions/v1/stripe-webhook`, événements `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`. Copiez la clé de signature (`whsec_...`) dans le secret Supabase `STRIPE_WEBHOOK_SECRET`.
-  5. Stripe > Paramètres > Billing > Portail client : activez le portail (moyen de paiement et factures).
-  6. Testez avec la carte `4242 4242 4242 4242`. Les produits « batiFlow Essentiel » et « batiFlow Pro » sont créés automatiquement au premier paiement.
-- Les prix (35 € / 70 € TTC par mois, 350 € / 700 € par an) sont définis dans `supabase/functions/*/lib.ts` (`PRICES`) **et** dans le site (`index.html`, `app.js`) : modifiez-les aux deux endroits.
-- **L'administration** (`admin.html`) reste utilisable pour attribuer une offre à la main (offre offerte, geste commercial).
+- **Essai gratuit** : 7 jours avec toutes les fonctions Pro, démarré automatiquement à l'inscription, sans carte bancaire. À la fin, l'espace passe en lecture seule (y compris côté base : déclencheurs `require_writable`) jusqu'au paiement.
+- **Paiement et activation automatiques** : depuis « Mon compte », le client choisit son offre, saisit son adresse de facturation et paie par carte sur la page sécurisée du Crédit Mutuel. La banque prévient la fonction Supabase `paiement` (serveur à serveur), qui vérifie le sceau et **active l'offre immédiatement**, sans intervention. Chaque paiement ajoute un mois ou un an à l'échéance ; payer avant l'échéance prolonge la période en cours.
+- **Pas de reconduction automatique** : le client renouvelle quand il veut (rappel dans l'espace 3 jours avant l'échéance, 3 jours de tolérance après). Si le Crédit Mutuel active plus tard l'option de paiement récurrent sur votre contrat, chaque échéance qu'il notifie prolonge aussi l'accès automatiquement.
+- **Offre Pro** : équipe jusqu'à 5 utilisateurs, planning partagé, statistiques, support prioritaire.
+- **Administration** (`admin.html`) : paiements reçus, encaissé sur 30 jours, statut et échéance de chaque client. Pour offrir une offre : choisissez-la et videz la date d'échéance (accès sans limite de durée).
+- Les prix (35 € / 70 € TTC par mois, 350 € / 700 € par an) sont dans `supabase/functions/paiement/index.ts` (`PRICES`) **et** dans le site (`index.html`, `app.js`, `admin.js`) : modifiez-les partout.
+
+**Activation** (tant que ce n'est pas fait, le bouton de paiement affiche « le paiement en ligne n'est pas encore activé ») :
+1. Souscrivez Monetico (paiement en ligne) auprès de votre agence Crédit Mutuel. Vous recevez un numéro de TPE, un code société et une clé de sécurité (40 caractères), d'abord pour l'environnement de test.
+2. Dans votre espace Monetico, renseignez l'URL de l'interface retour (URL de confirmation) : `https://yvdkrrkrxiizyelivtlv.supabase.co/functions/v1/paiement`.
+3. Supabase > Edge Functions > Secrets : ajoutez `MONETICO_TPE`, `MONETICO_KEY`, `MONETICO_SOCIETE`, `SITE_URL` (ex. `https://batiflow.fr`) et `MONETICO_MODE` = `test`.
+4. Faites au moins 3 paiements de test avec les cartes de test Monetico (la banque l'exige avant la production), vérifiez que l'offre s'active toute seule.
+5. Demandez le passage en production, remplacez la clé par la clé de production et passez `MONETICO_MODE` à `production`.
 
 À faire côté Supabase (Authentication > URL Configuration) : renseigner l'adresse du site dans « Site URL » et « Redirect URLs ». Pour la production, configurer un SMTP (Authentication > SMTP Settings).
 
-Pages légales : `mentions-legales.html`, `cgv.html`, `cgu.html`, `remboursement.html`, `confidentialite.html`, `cookies.html`. À compléter avant de vendre : les passages surlignés `[ENTRE CROCHETS]` (identité de l'éditeur, prestataire de paiement, durées, choix de remboursement), puis faire relire par un juriste.
+Pages légales : `mentions-legales.html`, `cgv.html`, `cgu.html`, `remboursement.html`, `confidentialite.html`, `cookies.html`. À compléter avant de vendre : les passages surlignés `[ENTRE CROCHETS]` (identité de l'éditeur, durées, choix de remboursement), puis faire relire par un juriste.
 
 ## Mise en ligne
 
